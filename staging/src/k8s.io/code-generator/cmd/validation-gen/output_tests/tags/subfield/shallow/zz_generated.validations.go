@@ -48,6 +48,8 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+var unionMembershipForUnionChildStruct = validate.NewUnionMembership([2]string{"stringField1", "StringField1"}, [2]string{"stringField2", "StringField2"})
+
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
@@ -98,6 +100,32 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			})...)
 			return
 		}(fldPath.Child("structPtrField"), obj.StructPtrField, safe.Field(oldObj, func(oldObj *Struct) *OtherStruct { return oldObj.StructPtrField }))...)
+
+	// field Struct.Union
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *UnionChildStruct) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField1", func(o *UnionChildStruct) *string { return o.StringField1 }, validate.OptionalPointer); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField2", func(o *UnionChildStruct) *string { return o.StringField2 }, validate.OptionalPointer); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForUnionChildStruct, func(obj *UnionChildStruct) bool {
+				if obj == nil {
+					return false
+				}
+				return obj.StringField1 != nil
+			}, func(obj *UnionChildStruct) bool {
+				if obj == nil {
+					return false
+				}
+				return obj.StringField2 != nil
+			})...)
+			return
+		}(fldPath.Child("union"), &obj.Union, safe.Field(oldObj, func(oldObj *Struct) *UnionChildStruct { return &oldObj.Union }))...)
 
 	return errs
 }

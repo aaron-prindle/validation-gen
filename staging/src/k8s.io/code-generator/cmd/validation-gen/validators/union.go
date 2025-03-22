@@ -37,34 +37,37 @@ func init() {
 	// Unions are comprised of multiple tags, which need to share information
 	// between them.  The tags are on struct fields, but the validation
 	// actually pertains to the struct itself.
-	shared := map[*types.Type]unions{}
-	RegisterTypeValidator(unionTypeValidator{shared})
+	shared := map[string]unions{}
+	RegisterTypeValidator(unionTypeOrFieldValidator{shared})
+	RegisterFieldValidator(unionTypeOrFieldValidator{shared})
 	RegisterTagValidator(unionDiscriminatorTagValidator{shared})
 	RegisterTagValidator(unionMemberTagValidator{shared})
 }
 
-type unionTypeValidator struct {
-	shared map[*types.Type]unions
+type unionTypeOrFieldValidator struct {
+	shared map[string]unions
 }
 
-func (unionTypeValidator) Init(_ Config) {}
+func (unionTypeOrFieldValidator) Init(_ Config) {}
 
-func (unionTypeValidator) Name() string {
-	return "unionTypeValidator"
+func (unionTypeOrFieldValidator) Name() string {
+	return "unionTypeOrFieldValidator"
 }
 
-func (utv unionTypeValidator) GetValidations(context Context) (Validations, error) {
+func BAR() {}
+func (utfv unionTypeOrFieldValidator) GetValidations(context Context) (Validations, error) {
 	result := Validations{}
 
 	// Gengo does not treat struct definitions as aliases, which is
 	// inconsistent but unlikely to change. That means we don't REALLY need to
 	// handle it here, but let's be extra careful and extract the most concrete
 	// type possible.
-	if util.NonPointer(util.NativeType(context.Type)).Kind != types.Struct {
+	//FIXME: map?
+	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct && k != types.Slice {
 		return result, nil
 	}
 
-	unions := utv.shared[context.Type]
+	unions := utfv.shared[context.Path.String()]
 	if len(unions) == 0 {
 		return result, nil
 	}
@@ -81,6 +84,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
 			//       The correct package would be the output package but is not known here. This does not show up in generated code.
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
+			//FIXME: name needed for this based on path?
 			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
 
 			var extractorArgs []any
@@ -146,7 +150,8 @@ const (
 )
 
 type unionDiscriminatorTagValidator struct {
-	shared map[*types.Type]unions
+	//FIXME: document key
+	shared map[string]unions
 }
 
 func (unionDiscriminatorTagValidator) Init(_ Config) {}
@@ -168,11 +173,12 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
-	if udtv.shared[context.Parent] == nil {
-		udtv.shared[context.Parent] = unions{}
+	pp := context.ParentPath.String()
+	if udtv.shared[pp] == nil {
+		udtv.shared[pp] = unions{}
 	}
 	unionArg, _ := tag.NamedArg("union") // optional
-	u := udtv.shared[context.Parent].getOrCreate(unionArg.Value)
+	u := udtv.shared[pp].getOrCreate(unionArg.Value)
 
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
@@ -182,7 +188,7 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 	}
 
 	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the unionTypeValidator.
+	// information. The validation is done by the unionTypeOrFieldValidator.
 	return Validations{}, nil
 }
 
@@ -201,7 +207,7 @@ func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 }
 
 type unionMemberTagValidator struct {
-	shared map[*types.Type]unions
+	shared map[string]unions
 }
 
 func (unionMemberTagValidator) Init(_ Config) {}
@@ -234,8 +240,9 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 		return Validations{}, fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
 	}
 
-	if umtv.shared[context.Parent] == nil {
-		umtv.shared[context.Parent] = unions{}
+	pp := context.ParentPath.String()
+	if umtv.shared[pp] == nil {
+		umtv.shared[pp] = unions{}
 	}
 	unionArg, _ := tag.NamedArg("union") // optional
 	var memberName string
@@ -245,12 +252,12 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 		memberName = context.Member.Name // default
 	}
 
-	u := umtv.shared[context.Parent].getOrCreate(unionArg.Value)
+	u := umtv.shared[pp].getOrCreate(unionArg.Value)
 	u.fields = append(u.fields, [2]string{fieldName, memberName})
 	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the unionTypeValidator.
+	// information. The validation is done by the unionTypeOrFieldValidator.
 	return Validations{}, nil
 }
 
