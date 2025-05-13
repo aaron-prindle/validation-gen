@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"unicode"
+	// unicode is kept for parseTagKey's potential use, though not directly in modified parseTagArgs
 )
 
 // ExtractCommentTags parses comments for lines of the form:
@@ -222,9 +222,6 @@ func (t Tag) String() string {
 // The tags argument is an optional list of tag names to match. If it is nil or
 // empty, all tags match.
 //
-// At the moment, arguments are very strictly formatted (see parseTagArgs) and
-// whitespace is not allowed.
-//
 // This function returns the key name and arguments, unless tagNames was
 // specified and the input did not match, in which case it returns "".
 func parseTagKey(input string, tagNames []string) (string, []string, error) {
@@ -246,6 +243,8 @@ func parseTagKey(input string, tagNames []string) (string, []string, error) {
 
 	var args []string
 	if len(parts) == 2 {
+		// parts[1] contains the argument string, including the closing ')'
+		// e.g., "argValue)" or "{\"key\":\"value\"})"
 		if ret, err := parseTagArgs(parts[1]); err != nil {
 			return key, nil, fmt.Errorf("failed to parse tag args: %v", err)
 		} else {
@@ -258,33 +257,27 @@ func parseTagKey(input string, tagNames []string) (string, []string, error) {
 // parseTagArgs parses the arguments part of an extended comment tag. The input
 // is assumed to be the entire text of the original input after the opening
 // '(', including the trailing ')'.
-//
-// At the moment this assumes that the entire string between the opening '('
-// and the trailing ')' is a single Go-style identifier token, but in the
-// future could be extended to have multiple arguments with actual syntax.  The
-// single token may consist only of letters and digits.  Whitespace is not
-// allowed.
+// E.g., if the tag is "+name(argContent)=value", input to this function will be "argContent)".
+// This function is modified to treat the entire content before the final ')' as a single argument.
 func parseTagArgs(input string) ([]string, error) {
-	// This is really dumb, but should be extendable to a "real" parser if
-	// needed.
-	runes := []rune(input)
-	for i, r := range runes {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			continue
-		}
-		if r == ',' {
-			return nil, fmt.Errorf("multiple arguments are not supported: %q", input)
-		}
-		if r == ')' {
-			if i != len(runes)-1 {
-				return nil, fmt.Errorf("unexpected characters after ')': %q", string(runes[i:]))
-			}
-			if i == 0 {
-				return nil, nil
-			}
-			return []string{string(runes[:i])}, nil
-		}
-		return nil, fmt.Errorf("unsupported character: %q", string(r))
+	n := len(input)
+	if n == 0 {
+		// This case should ideally not be reached if parseTagKey passes valid data,
+		// as "()" would result in input==")".
+		return nil, fmt.Errorf("empty argument string received by parseTagArgs")
 	}
-	return nil, fmt.Errorf("no closing ')' found: %q", input)
+
+	// The input must end with a ')'
+	if input[n-1] != ')' {
+		return nil, fmt.Errorf("argument string %q does not end with ')'", input)
+	}
+
+	// If the input is just ")", it means the original tag was like "name()" (empty arguments).
+	if n == 1 { // input == ")"
+		return nil, nil // No arguments
+	}
+
+	// The argument is everything before the final ')'
+	arg := input[:n-1]
+	return []string{arg}, nil
 }
