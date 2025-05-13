@@ -30,7 +30,14 @@ import (
 
 const (
 	subfieldTagName = "k8s:subfield"
+
+	virtualMemberPrefix = "_subfield_"
 )
+
+func sanitizeForVirtualName(s string) string {
+	r := strings.NewReplacer("\"", "", "=", "_is_", ",", "_and_", "[", "_", "]", "_", ":", "_")
+	return r.Replace(s)
+}
 
 func init() {
 	RegisterTagValidator(&subfieldTagValidator{})
@@ -161,22 +168,48 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 
 		// TODO(aaron-prindle) check to see if requirement to enforce context.Parent and/or context.Member are non-nil for path generation.
 
-		// generates context path like Struct.Conditions[status="true",type="Approved"]
-		subContextPath := util.GeneratePathForMap(parsedArg.ListElems)
-		subContext := Context{
-			Scope: ScopeField,
-			Type:  elemT,
-			// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
-			Parent: nil,
-			Path:   context.Path.Key(subContextPath),
-			// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
-			Member: nil,
+		var subContextForPayload Context
+
+		payloadTagName := strings.Split(strings.TrimPrefix(payload, "+"), "=")[0]
+		payloadTagName = strings.Split(payloadTagName, "(")[0]
+
+		if context.Parent == nil || context.Member == nil {
+			return Validations{}, fmt.Errorf("list access for parent-scoped payload on %s, which lacks necessary original parent/member context", context.Path.String())
 		}
 
-		if validations, err := stv.validator.ExtractValidations(subContext, fakeComments); err != nil {
-			return Validations{}, err
-		} else {
+		baseElementPath := context.Path.Key(util.GeneratePathForMap(parsedArg.ListElems))
+		virtualMemberName := fmt.Sprintf("%s%s_%s",
+			virtualMemberPrefix,
+			context.Member.Name,
+			sanitizeForVirtualName(util.GeneratePathForMap(parsedArg.ListElems)))
 
+		virtualJsonTagStr := fmt.Sprintf(`json:"%s"`, virtualMemberName)
+
+		virtualMember := &types.Member{
+			Name: virtualMemberName,
+			Type: elemT,
+			Tags: virtualJsonTagStr,
+		}
+
+		subContextForPayload = Context{
+			Scope:  ScopeField,
+			Type:   elemT,
+			Parent: context.Parent,
+			Path:   baseElementPath.Child(virtualMemberName),
+			Member: virtualMember,
+		}
+
+		if validations, err := stv.validator.ExtractValidations(subContextForPayload, fakeComments); err != nil {
+
+			var memberNameForError string
+			if subContextForPayload.Member != nil {
+				memberNameForError = subContextForPayload.Member.Name
+			} else {
+				memberNameForError = "<nil>"
+			}
+			return Validations{}, fmt.Errorf("failed to extract chained validations for %s list access (selector: %v, payload: %s, applying to element type %s with context scope %s, member %s) on %s: %w", subfieldTagName, parsedArg.ListElems, payload, elemT.Name.String(), subContextForPayload.Scope, memberNameForError, context.Path.String(), err)
+
+		} else {
 			result := Validations{}
 			result.Variables = append(result.Variables, validations.Variables...)
 

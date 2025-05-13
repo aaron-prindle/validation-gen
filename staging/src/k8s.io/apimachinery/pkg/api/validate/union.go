@@ -46,13 +46,18 @@ func Union(_ context.Context, op operation.Operation, fldPath *field.Path, _, _ 
 		}
 	}
 	var specifiedMember *string
-	for i, fieldValue := range fieldValues {
+	evaluatedFieldValues := make([]any, len(fieldValues))
+
+	for i, fv := range fieldValues {
+		fieldValue := evaluateFieldValueIfFunc(fv)
+		evaluatedFieldValues[i] = fieldValue
+
 		rv := reflect.ValueOf(fieldValue)
 		if rv.IsValid() && !rv.IsZero() {
 			m := union.members[i]
 			if specifiedMember != nil && *specifiedMember != m.discriminatorValue {
 				return field.ErrorList{
-					field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(union.specifiedFields(fieldValues), ", ")),
+					field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(union.specifiedFields(evaluatedFieldValues), ", ")),
 						fmt.Sprintf("must specify exactly one of: %s", strings.Join(union.allFields(), ", "))),
 				}
 			}
@@ -83,6 +88,7 @@ func Union(_ context.Context, op operation.Operation, fldPath *field.Path, _, _ 
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
 func DiscriminatedUnion[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, _, _ any, union *UnionMembership, discriminatorValue T, fieldValues ...any) (errs field.ErrorList) {
+	// TODO(aaron-prindle) update discriminatorValue to also be a func() T and plumb evaluateFieldValueIfFunc.
 	discriminatorStrValue := string(discriminatorValue)
 	if len(union.members) != len(fieldValues) {
 		return field.ErrorList{
@@ -158,4 +164,21 @@ func (u UnionMembership) allFields() []string {
 		memberNames = append(memberNames, fmt.Sprintf("`%s`", f.fieldName))
 	}
 	return memberNames
+}
+
+func evaluateFieldValueIfFunc(fieldValue any) any {
+	rv := reflect.ValueOf(fieldValue)
+	if rv.Kind() == reflect.Func {
+		rt := rv.Type()
+		if rt.NumIn() == 0 && rt.NumOut() > 0 {
+			// If function with no input params and > 0 output params, call the function.
+			results := rv.Call(nil)
+			if len(results) > 0 {
+				return results[0].Interface()
+			}
+			return nil
+		}
+	}
+	// Not a function, return original value
+	return fieldValue
 }
