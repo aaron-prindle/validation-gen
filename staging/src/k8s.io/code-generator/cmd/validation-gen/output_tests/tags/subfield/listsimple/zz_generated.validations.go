@@ -48,16 +48,36 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Conditions
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []MyCondition) (errs field.ErrorList) {
-			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"type": "Approved"} }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
+			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"type": "Approved"} }, func(item *MyCondition) bool {
+				if item == nil {
+					return false
+				}
+				return item.Type == "Approved"
+			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[type=Approved]")
 			})...)
-			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"type": "NonExistent"} }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
+			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"type": "NonExistent"} }, func(item *MyCondition) bool {
+				if item == nil {
+					return false
+				}
+				return item.Type == "NonExistent"
+			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[type=NonExistent]")
 			})...)
-			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"status": "True", "type": "Approved"} }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
+			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"status": "True", "type": "Approved"} }, func(item *MyCondition) bool {
+				if item == nil {
+					return false
+				}
+				return item.Status == "True" && item.Type == "Approved"
+			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[status=True,type=Approved]")
 			})...)
-			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"stringPtr": "Target"} }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
+			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func() map[string]string { return map[string]string{"stringPtr": "Target"} }, func(item *MyCondition) bool {
+				if item == nil {
+					return false
+				}
+				return (item.StringPtr != nil && *item.StringPtr == "Target")
+			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[stringPtr=Target]")
 			})...)
 			return

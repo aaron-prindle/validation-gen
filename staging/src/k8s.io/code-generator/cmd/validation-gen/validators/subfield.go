@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/validate/util"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -179,24 +180,49 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 			result := Validations{}
 			result.Variables = append(result.Variables, validations.Variables...)
 
-			sortedKeys := make([]string, 0, len(parsedArg.ListElems))
+			// MODIFIED: Create the GetSelectorMapForPathFunc literal
+			selectorMapLiteralParts := []string{}
+
+			sortedSelectorKeys := make([]string, 0, len(parsedArg.ListElems))
 			for k := range parsedArg.ListElems {
-				sortedKeys = append(sortedKeys, k)
+				sortedSelectorKeys = append(sortedSelectorKeys, k)
 			}
-			sort.Strings(sortedKeys)
-			mapEntries := make([]string, 0, len(parsedArg.ListElems))
-			for _, k := range sortedKeys {
-				mapEntries = append(mapEntries, fmt.Sprintf("%q: %q", k, parsedArg.ListElems[k]))
+			sort.Strings(sortedSelectorKeys)
+			for _, k := range sortedSelectorKeys {
+				selectorMapLiteralParts = append(selectorMapLiteralParts, fmt.Sprintf("%q: %q", k, parsedArg.ListElems[k]))
+			}
+			getSelectorMapFnLiteral := FunctionLiteral{
+				Parameters: []ParamResult{},
+				Results:    []ParamResult{{"", &types.Type{Kind: types.Map, Key: types.String, Elem: types.String}}},
+				Body:       fmt.Sprintf("return map[string]string{%s}", strings.Join(selectorMapLiteralParts, ", ")),
 			}
 
-			getKeyValuesFn := FunctionLiteral{
-				Parameters: []ParamResult{},
-				Results: []ParamResult{{"", &types.Type{
-					Kind: types.Map,
-					Key:  types.String,
-					Elem: types.String,
-				}}},
-				Body: fmt.Sprintf("return map[string]string{%s}", strings.Join(mapEntries, ", ")),
+			var matchFuncBody strings.Builder
+			matchFuncBody.WriteString("if item == nil { return false }\n")
+			var conditions []string
+			for jsonKey, expectedValue := range parsedArg.ListElems {
+				goFieldName, errGFN := getGoFieldNameFromJSONKeyForSubfield(elemT, jsonKey)
+				if errGFN != nil {
+					return Validations{}, fmt.Errorf("error creating MatchFunc for %s: could not get Go field name for JSON key '%s' in type '%s': %w", context.Path.String(), jsonKey, elemT.Name.String(), errGFN)
+				}
+				fieldMember := getMember(elemT, goFieldName)
+				isPtrToString := false
+				if fieldMember != nil && fieldMember.Type.Kind == types.Pointer && fieldMember.Type.Elem != nil && fieldMember.Type.Elem.Kind == types.String.Kind {
+					isPtrToString = true
+				}
+
+				if isPtrToString {
+					conditions = append(conditions, fmt.Sprintf("(item.%s != nil && *item.%s == %q)", goFieldName, goFieldName, expectedValue))
+				} else {
+					conditions = append(conditions, fmt.Sprintf("item.%s == %q", goFieldName, expectedValue))
+				}
+			}
+			matchFuncBody.WriteString(fmt.Sprintf("return %s", strings.Join(conditions, " && ")))
+
+			matchFnLiteral := FunctionLiteral{
+				Parameters: []ParamResult{{"item", types.PointerTo(elemT)}},
+				Results:    []ParamResult{{"", types.Bool}},
+				Body:       matchFuncBody.String(),
 			}
 
 			for _, vfn := range validations.Functions {
@@ -217,7 +243,8 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 					subfieldTagName,
 					listMapCallFlags,
 					validateListMapElementByKey,
-					getKeyValuesFn,
+					getSelectorMapFnLiteral,
+					matchFnLiteral,
 					WrapperFunction{vfn, elemT},
 				)
 				result.Functions = append(result.Functions, f)
@@ -257,6 +284,39 @@ func parseSubfieldArg(argStr string) (*parsedSubfieldArg, error) {
 	return &parsedSubfieldArg{
 		SubName: argStr,
 	}, nil
+}
+
+// Added getMember helper, as it's used by MatchFunc generation
+func getMember(structType *types.Type, goFieldName string) *types.Member {
+	s := nonPointer(nativeType(structType))
+	if s.Kind != types.Struct {
+		return nil
+	}
+	for i := range s.Members {
+		if s.Members[i].Name == goFieldName {
+			return &s.Members[i]
+		}
+	}
+	return nil
+}
+
+func getGoFieldNameFromJSONKeyForSubfield(structType *types.Type, jsonKeyToFind string) (string, error) {
+	s := nonPointer(nativeType(structType))
+	if s.Kind != types.Struct {
+		return "", fmt.Errorf("cannot get Go field name for JSON key '%s': type %s is not a struct", jsonKeyToFind, structType.Name)
+	}
+	for i := range s.Members {
+		memberPtr := &s.Members[i]
+		jsonAnnotation, ok := tags.LookupJSON(*memberPtr)
+		effectiveJSONName := memberPtr.Name
+		if ok && jsonAnnotation.Name != "" {
+			effectiveJSONName = jsonAnnotation.Name
+		}
+		if effectiveJSONName == jsonKeyToFind {
+			return memberPtr.Name, nil
+		}
+	}
+	return "", fmt.Errorf("no field with effective JSON name %q in type %s", jsonKeyToFind, s.Name.String())
 }
 
 // TODO(aaron-prindle) update Docs() w/ info for new listMapElem support
