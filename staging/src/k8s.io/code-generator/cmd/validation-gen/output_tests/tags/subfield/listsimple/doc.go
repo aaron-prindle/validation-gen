@@ -26,10 +26,11 @@ var localSchemeBuilder = testscheme.New()
 type Struct struct {
 	TypeMeta int `json:"typeMeta"`
 
-	// +k8s:subfield({"listElems":{"type":"Approved"}})=+k8s:validateFalse="subfield Conditions[type=Approved]"
-	// +k8s:subfield({"listElems":{"type":"NonExistent"}})=+k8s:validateFalse="subfield Conditions[type=NonExistent]"
-	// +k8s:subfield({"listElems":{"status":"True", "type":"Approved"}})=+k8s:validateFalse="subfield Conditions[status=True,type=Approved]"
-	// +k8s:subfield({"listElems":{"stringPtr":"Target"}})=+k8s:validateFalse="subfield Conditions[stringPtr=Target]"
+	// +listType=map
+	// +listMapKey=type
+	// +k8s:subfield({"type":"Approved"})=+k8s:validateFalse="subfield Conditions[type=Approved]"
+	// +k8s:subfield({"status":"True","type":"Approved"})=+k8s:validateFalse="subfield Conditions[status=True,type=Approved]"
+	// +k8s:subfield({"stringPtr":"Target", "type":"Approved"})=+k8s:validateFalse="subfield Conditions[stringPtr=Target,type=Approved]"
 	Conditions []MyCondition `json:"conditions"`
 }
 

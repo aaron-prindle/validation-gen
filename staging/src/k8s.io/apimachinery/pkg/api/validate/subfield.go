@@ -43,43 +43,34 @@ func Subfield[Tstruct any, Tfield any](ctx context.Context, op operation.Operati
 	return errs
 }
 
+// ListMapElementByKey validates a subfield of a list item where one of the selectors
+// is the listMapKey=... against a selector function.
 func ListMapElementByKey[TList ~[]TItem, TItem any](
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	newList, oldList TList,
 	matches MatchFn[TItem],
 	elementValidator func(ctx context.Context, op operation.Operation, fldPath *field.Path, newObj, oldObj *TItem) field.ErrorList,
 ) field.ErrorList {
-	var errs field.ErrorList
-	processedOldIndices := make(map[int]bool)
-
-	for i := range newList {
-		curI := &newList[i]
-		if !matches(curI) {
-			continue
-		}
-		var oldJ *TItem
-
-		for j := range oldList {
-			if processedOldIndices[j] {
-				continue
-			}
-
-			if matches(&oldList[j]) {
-				oldJ = &oldList[j]
-				processedOldIndices[j] = true
-				break
-			}
-		}
-		// Pass matching element present in newList and oldList to validator.
-		errs = append(errs, elementValidator(ctx, op, fldPath.Index(i), curI, oldJ)...)
-	}
+	var matchedNew, matchedOld *TItem
+	var matchedIdx int
 
 	for i := range oldList {
-		oldI := &oldList[i]
-		if !processedOldIndices[i] && matches(oldI) {
-			// Pass matching element present only in oldList to validator.
-			errs = append(errs, elementValidator(ctx, op, fldPath.Index(i), nil, oldI)...)
+		if matches(&oldList[i]) {
+			matchedOld = &oldList[i]
+			matchedIdx = i
+			break
 		}
 	}
-	return errs
+	for i := range newList {
+		if matches(&newList[i]) {
+			matchedNew = &newList[i]
+			matchedIdx = i
+			break
+		}
+	}
+	if matchedNew == nil && matchedOld == nil {
+		return nil
+	}
+
+	return elementValidator(ctx, op, fldPath.Index(matchedIdx), matchedNew, matchedOld)
 }

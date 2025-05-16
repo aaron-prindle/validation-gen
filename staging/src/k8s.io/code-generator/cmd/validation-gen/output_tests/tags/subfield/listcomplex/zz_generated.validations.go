@@ -48,14 +48,17 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.Items
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []Item) (errs field.ErrorList) {
-			errs = append(errs, validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func(item *Item) bool {
+			if e := validate.ListMapElementByKey(ctx, op, fldPath, obj, oldObj, func(item *Item) bool {
 				if item == nil {
 					return false
 				}
 				return item.Status == "True" && item.Type == "foo"
 			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
 				return validate.Subfield(ctx, op, fldPath, obj, oldObj, "nestedStruct", func(o *Item) *NestedStruct { return o.NestedStruct }, validate.RequiredPointer)
-			})...)
+			}); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			return
 		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }))...)
 

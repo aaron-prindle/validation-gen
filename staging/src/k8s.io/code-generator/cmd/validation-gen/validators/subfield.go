@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/validate/util"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
@@ -54,19 +53,9 @@ func (subfieldTagValidator) ValidScopes() sets.Set[Scope] {
 	return subfieldTagValidScopes
 }
 
-type subfieldArgumentPayload struct {
-	ListElems map[string]string `json:"listElems"`
-	Flags     *struct {
-		ShortCircuit *bool `json:"ShortCircuit,omitempty"`
-		NonError     *bool `json:"NonError,omitempty"`
-	} `json:"flags,omitempty"`
-}
-
 type parsedSubfieldArg struct {
-	ListElems    map[string]string
-	ShortCircuit bool
-	NonError     bool
-	SubName      string
+	MatcherMap map[string]string
+	SubName    string
 }
 
 var (
@@ -95,7 +84,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 			return Validations{}, fmt.Errorf("can only be used on struct types")
 		}
 
-		subname := configStr
+		subname := parsedArg.SubName
 		submemb := getMemberByJSON(t, subname)
 		if submemb == nil {
 			return Validations{}, fmt.Errorf("no field for json name %q", subname)
@@ -143,26 +132,35 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 
 	} else { // +k8s:subfield({"listMapElems":{"..."}}) usage
 		if t.Kind != types.Slice && t.Kind != types.Array {
-			return Validations{}, fmt.Errorf("list access via 'listElems' can only be used on slice/array types, but tag is on field %s of type %s", context.Path.String(), t.Name.String())
+			return Validations{}, fmt.Errorf("can only be used on list types")
 		}
 
 		elemT := nonPointer(nativeType(t.Elem))
 		if elemT.Kind != types.Struct {
-			return Validations{}, fmt.Errorf("elements of slice/array must be structs for key-based selection, but elements of field %s are %s", context.Path.String(), elemT.Name.String())
+			return Validations{}, fmt.Errorf("can only be used on list of structs")
 		}
 
-		for k := range parsedArg.ListElems {
+		if context.Member == nil {
+			// TODO(aaron-prindle) more descriptive error would be helpful here
+			// currently not sure what cases this occurs for
+			return Validations{}, fmt.Errorf("unexpected nil context member")
+		}
+		listMapKey := parseListMapKey(context.Member.CommentLines)
+		if len(listMapKey) == 0 {
+			return Validations{}, fmt.Errorf("must have '+listType=map' and '+listMapKey=...' annotations to use subfield with matcher map")
+		}
+		if _, ok := parsedArg.MatcherMap[listMapKey]; !ok {
+			return Validations{}, fmt.Errorf("subfield matcher map must contain listMap key")
+		}
+
+		for k := range parsedArg.MatcherMap {
 			if getMemberByJSON(elemT, k) == nil {
-				return Validations{}, fmt.Errorf("element type %s (of list %s) has no field with JSON name %q", elemT.Name.String(), context.Path.String(), k)
+				return Validations{}, fmt.Errorf("element type %s has no field with JSON name %q", elemT.Name.String(), k)
 			}
 		}
 
-		// TODO(aaron-prindle) currently can only select on slice fields that are strings, should have error related to this.
-
-		// TODO(aaron-prindle) check to see if requirement to enforce context.Parent and/or context.Member are non-nil for path generation.
-
 		// generates context path like Struct.Conditions[status="true",type="Approved"]
-		subContextPath := util.GeneratePathForMap(parsedArg.ListElems)
+		subContextPath := generatePathForMap(parsedArg.MatcherMap)
 		subContext := Context{
 			Scope: ScopeField,
 			Type:  elemT,
@@ -180,28 +178,15 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 			result := Validations{}
 			result.Variables = append(result.Variables, validations.Variables...)
 
-			matchFn, err := createMatchFnLiteral(elemT, parsedArg.ListElems)
+			matchFn, err := createMatchFn(elemT, parsedArg.MatcherMap)
 			if err != nil {
 				return Validations{}, err
 			}
 
 			for _, vfn := range validations.Functions {
-				listMapCallFlags := DefaultFlags
-				if parsedArg.ShortCircuit {
-					listMapCallFlags |= ShortCircuit
-				}
-				if parsedArg.NonError {
-					listMapCallFlags |= NonError
-				}
-
-				if listMapCallFlags.IsSet(NonError) && !listMapCallFlags.IsSet(ShortCircuit) {
-					// TODO(aaron-prindle) FIXME - NonError: true, ShortCircuit: false causes code generator panic, remove NonError in this case.
-					listMapCallFlags &^= NonError
-				}
-
 				f := Function(
 					subfieldTagName,
-					listMapCallFlags,
+					vfn.Flags,
 					validateListMapElementByKey,
 					matchFn,
 					WrapperFunction{vfn, elemT},
@@ -215,26 +200,14 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 }
 
 func parseSubfieldArg(argStr string) (*parsedSubfieldArg, error) {
-	var sap subfieldArgumentPayload
-
-	if err := json.Unmarshal([]byte(argStr), &sap); err == nil {
-		if len(sap.ListElems) == 0 {
-			return nil, fmt.Errorf("'listElems' map cannot be empty")
+	var matcherMap map[string]string
+	if err := json.Unmarshal([]byte(argStr), &matcherMap); err == nil {
+		if len(matcherMap) == 0 {
+			return nil, fmt.Errorf("subfield JSON matcher map cannot be empty")
 		}
 
-		var shortCircuit, nonError bool
-		if sap.Flags != nil {
-			if sap.Flags.ShortCircuit != nil {
-				shortCircuit = *sap.Flags.ShortCircuit
-			}
-			if sap.Flags.NonError != nil {
-				nonError = *sap.Flags.NonError
-			}
-		}
 		return &parsedSubfieldArg{
-			ListElems:    sap.ListElems,
-			ShortCircuit: shortCircuit,
-			NonError:     nonError,
+			MatcherMap: matcherMap,
 		}, nil
 	}
 	if argStr == "" {
@@ -245,7 +218,7 @@ func parseSubfieldArg(argStr string) (*parsedSubfieldArg, error) {
 	}, nil
 }
 
-func createMatchFnLiteral(elemT *types.Type, listElems map[string]string) (FunctionLiteral, error) {
+func createMatchFn(elemT *types.Type, listElems map[string]string) (FunctionLiteral, error) {
 	var matchFuncBody strings.Builder
 	matchFuncBody.WriteString("if item == nil { return false }\n")
 
@@ -263,23 +236,25 @@ func createMatchFnLiteral(elemT *types.Type, listElems map[string]string) (Funct
 			return FunctionLiteral{}, err
 		}
 
-		isStrPtr := false
 		fieldMember, err := getMember(elemT, fieldname)
 		if err != nil {
 			return FunctionLiteral{}, err
 		}
-		if fieldMember.Type.Kind == types.Pointer {
-			isStrPtr = true
-		}
 
-		if isStrPtr {
-			conditions = append(conditions, fmt.Sprintf("(item.%s != nil && *item.%s == %q)", fieldname, fieldname, listElems[jsonKey]))
+		// TODO(aaron-prindle) support additional builtin types
+		var condition string
+		if fieldMember.Type.Kind == types.Pointer && fieldMember.Type.Elem != nil &&
+			fieldMember.Type.Elem.Name.Name == "string" {
+			condition = fmt.Sprintf("(item.%s != nil && *item.%s == %q)", fieldname, fieldname, listElems[jsonKey])
+		} else if fieldMember.Type.Name.Name == "string" {
+			condition = fmt.Sprintf("item.%s == %q", fieldname, listElems[jsonKey])
 		} else {
-			conditions = append(conditions, fmt.Sprintf("item.%s == %q", fieldname, listElems[jsonKey]))
+			return FunctionLiteral{}, fmt.Errorf("must be a string or *string, but got type %s", fieldMember.Type.String())
 		}
+		conditions = append(conditions, condition)
 	}
-	matchFuncBody.WriteString(fmt.Sprintf("return %s", strings.Join(conditions, " && ")))
 
+	matchFuncBody.WriteString(fmt.Sprintf("return %s", strings.Join(conditions, " && ")))
 	return FunctionLiteral{
 		Parameters: []ParamResult{{"item", types.PointerTo(elemT)}},
 		Results:    []ParamResult{{"", types.Bool}},
@@ -313,19 +288,66 @@ func getFieldNameFromJSONKey(s *types.Type, jsonKey string) (string, error) {
 	return "", fmt.Errorf("no field with JSON name %q in type %s", jsonKey, s.Name.String())
 }
 
-// TODO(aaron-prindle) update Docs() w/ info for new listMapElem support
+func parseListMapKey(commentLines []string) string {
+	var key string
+	hasListTypeMap := false
+
+	for _, line := range commentLines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "+listType=map" {
+			hasListTypeMap = true
+		}
+		if strings.HasPrefix(trimmedLine, "+listMapKey=") {
+			keyPart := strings.TrimPrefix(trimmedLine, "+listMapKey=")
+			trimmedKey := strings.TrimSpace(keyPart)
+			if trimmedKey != "" {
+				key = trimmedKey
+			}
+		}
+	}
+
+	if hasListTypeMap && key != "" {
+		return key
+	}
+	return ""
+}
+
+func generatePathForMap(keyValues map[string]string) string {
+	keys := make([]string, 0, len(keyValues))
+	for k := range keyValues {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var sb strings.Builder
+	for i, k := range keys {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(fmt.Sprintf("%s=%q", k, keyValues[k]))
+	}
+	return sb.String()
+}
+
 func (stv subfieldTagValidator) Docs() TagDoc {
 	doc := TagDoc{
-		Tag:         stv.TagName(),
-		Scopes:      stv.ValidScopes().UnsortedList(),
-		Description: "Declares a validation for a subfield of a struct.",
-		Args: []TagArgDoc{{
-			Description: "<field-json-name>",
-		}},
-		Docs: "The named subfield must be a direct field of the struct, or of an embedded struct.",
+		Tag:    stv.TagName(),
+		Scopes: stv.ValidScopes().UnsortedList(),
+		Description: "Declares a validation for a subfield of a struct or a select struct in a list with listType=map" +
+			"matching specified criteria. When used for list-map elements, one of the match criteria must be on value of the listMapKey",
+		Args: []TagArgDoc{
+			{
+				Description: "<field-json-name>",
+			},
+			{
+				Description: `{"<jsonKey>":"<value>", ...}`,
+			},
+		},
+		Docs: "When used with `<field-json-name>`, the named subfield must be a direct field. " +
+			"When used with a JSON map, it applies to elements of a list of structs.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
-			Docs:        "The tag to evaluate for the subfield.",
+			Docs:        "The tag to evaluate for the subfield or selected list elements.",
 		}},
 	}
 	return doc

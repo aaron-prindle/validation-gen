@@ -46,30 +46,4 @@ func TestListComplexSubfield(t *testing.T) {
 		},
 	}).ExpectValid()
 
-	st.Value(&Struct{
-		Items: []Item{
-			{Type: "foo", Status: "True", NestedStruct: nil},
-			{Type: "foo", Status: "True", NestedStruct: &NestedStruct{Value: ptr.To("another")}},
-		},
-	}).ExpectInvalid(
-		field.Required(field.NewPath("items").Index(0).Child("nestedStruct"), ""),
-	)
-
-	st.Value(&Struct{
-		Items: []Item{
-			{Type: "foo", Status: "True", NestedStruct: nil},
-			{Type: "foo", Status: "True", NestedStruct: nil},
-		},
-	}).ExpectInvalid(
-		field.Required(field.NewPath("items").Index(0).Child("nestedStruct"), ""),
-		field.Required(field.NewPath("items").Index(1).Child("nestedStruct"), ""),
-	)
-
-	st.Value(&Struct{
-		Items: []Item{
-			{Type: "bar", Status: "Active", NestedStruct: nil},
-			{Type: "bar", Status: "Inactive", NestedStruct: &NestedStruct{Value: ptr.To("optional but present")}},
-		},
-	}).ExpectValid()
-
 }

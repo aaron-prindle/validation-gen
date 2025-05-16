@@ -50,29 +50,6 @@ func TestSubfieldListSimple(t *testing.T) {
 
 	st.Value(&Struct{
 		Conditions: []MyCondition{
-			{Type: "NonExistent", Status: "Anything"},
-		},
-	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {"subfield Conditions[type=NonExistent]"},
-	})
-
-	st.Value(&Struct{
-		Conditions: []MyCondition{
-			{Type: "Approved", Status: "True"},
-			{Type: "Approved", Status: "False"},
-		},
-	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {
-			"subfield Conditions[type=Approved]",
-			"subfield Conditions[status=True,type=Approved]",
-		},
-		`conditions[1]`: {
-			"subfield Conditions[type=Approved]",
-		},
-	})
-
-	st.Value(&Struct{
-		Conditions: []MyCondition{
 			{Type: "Approved", Status: "True"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
@@ -92,10 +69,12 @@ func TestSubfieldListSimple(t *testing.T) {
 
 	st.Value(&Struct{
 		Conditions: []MyCondition{
-			{Type: "UnknownType", StringPtr: ptr.To("Target")},
+			{Type: "Approved", StringPtr: ptr.To("Target")},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {"subfield Conditions[stringPtr=Target]"},
+		`conditions[0]`: {
+			"subfield Conditions[stringPtr=Target,type=Approved]",
+			"subfield Conditions[type=Approved]"},
 	})
 
 	st.Value(&Struct{
@@ -109,19 +88,4 @@ func TestSubfieldListSimple(t *testing.T) {
 			{Type: "UnknownType", StringPtr: nil},
 		},
 	}).ExpectValid()
-
-	st.Value(&Struct{
-		Conditions: []MyCondition{
-			{Type: "Item1", StringPtr: ptr.To("Target")},
-			{Type: "Approved", Status: "True"},
-		},
-	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {
-			"subfield Conditions[stringPtr=Target]",
-		},
-		`conditions[1]`: {
-			"subfield Conditions[type=Approved]",
-			"subfield Conditions[status=True,type=Approved]",
-		},
-	})
 }
