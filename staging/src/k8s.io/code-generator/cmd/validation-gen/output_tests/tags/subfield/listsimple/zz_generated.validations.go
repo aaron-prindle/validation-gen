@@ -76,9 +76,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				if item == nil {
 					return false
 				}
-				return (item.StringPtr != nil && *item.StringPtr == "Target")
+				return (item.StringPtr != nil && *item.StringPtr == "Target") && item.Type == "Approved"
 			}, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MyCondition) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[stringPtr=Target]")
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Conditions[stringPtr=Target,type=Approved]")
 			})...)
 			return
 		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *Struct) []MyCondition { return oldObj.Conditions }))...)

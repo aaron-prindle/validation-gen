@@ -143,23 +143,40 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 
 	} else { // +k8s:subfield({"listMapElems":{"..."}}) usage
 		if t.Kind != types.Slice && t.Kind != types.Array {
-			return Validations{}, fmt.Errorf("list access via 'listElems' can only be used on slice/array types, but tag is on field %s of type %s", context.Path.String(), t.Name.String())
+			return Validations{}, fmt.Errorf("can only be used on list types")
 		}
 
 		elemT := nonPointer(nativeType(t.Elem))
 		if elemT.Kind != types.Struct {
-			return Validations{}, fmt.Errorf("elements of slice/array must be structs for key-based selection, but elements of field %s are %s", context.Path.String(), elemT.Name.String())
+			return Validations{}, fmt.Errorf("can only be used on list of structs")
+		}
+
+		if context.Member == nil {
+			return Validations{}, fmt.Errorf("unexpected nil context member")
+		}
+		listMapKeys := parseListMapKeys(context.Member.CommentLines)
+		if len(listMapKeys) == 0 {
+			return Validations{}, fmt.Errorf("must have '+listType=map' and '+listMapKey=...' annotations to use subfield with listElems")
+		}
+
+		for _, listMapKey := range listMapKeys {
+			found := false
+			for k := range parsedArg.ListElems {
+				if listMapKey == k {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return Validations{}, fmt.Errorf("subfield listElems must contain all listMap keys")
+			}
 		}
 
 		for k := range parsedArg.ListElems {
 			if getMemberByJSON(elemT, k) == nil {
-				return Validations{}, fmt.Errorf("element type %s (of list %s) has no field with JSON name %q", elemT.Name.String(), context.Path.String(), k)
+				return Validations{}, fmt.Errorf("element type %s has no field with JSON name %q", elemT.Name.String(), k)
 			}
 		}
-
-		// TODO(aaron-prindle) currently can only select on slice fields that are strings, should have error related to this.
-
-		// TODO(aaron-prindle) check to see if requirement to enforce context.Parent and/or context.Member are non-nil for path generation.
 
 		// generates context path like Struct.Conditions[status="true",type="Approved"]
 		subContextPath := util.GeneratePathForMap(parsedArg.ListElems)
@@ -180,7 +197,7 @@ func (stv *subfieldTagValidator) GetValidations(context Context, args []string, 
 			result := Validations{}
 			result.Variables = append(result.Variables, validations.Variables...)
 
-			matchFn, err := createMatchFnLiteral(elemT, parsedArg.ListElems)
+			matchFn, err := createMatchFn(elemT, parsedArg.ListElems)
 			if err != nil {
 				return Validations{}, err
 			}
@@ -245,7 +262,7 @@ func parseSubfieldArg(argStr string) (*parsedSubfieldArg, error) {
 	}, nil
 }
 
-func createMatchFnLiteral(elemT *types.Type, listElems map[string]string) (FunctionLiteral, error) {
+func createMatchFn(elemT *types.Type, listElems map[string]string) (FunctionLiteral, error) {
 	var matchFuncBody strings.Builder
 	matchFuncBody.WriteString("if item == nil { return false }\n")
 
@@ -263,23 +280,25 @@ func createMatchFnLiteral(elemT *types.Type, listElems map[string]string) (Funct
 			return FunctionLiteral{}, err
 		}
 
-		isStrPtr := false
 		fieldMember, err := getMember(elemT, fieldname)
 		if err != nil {
 			return FunctionLiteral{}, err
 		}
-		if fieldMember.Type.Kind == types.Pointer {
-			isStrPtr = true
-		}
 
-		if isStrPtr {
-			conditions = append(conditions, fmt.Sprintf("(item.%s != nil && *item.%s == %q)", fieldname, fieldname, listElems[jsonKey]))
+		// TODO(aaron-prindle) support additional builtin types
+		var condition string
+		if fieldMember.Type.Kind == types.Pointer && fieldMember.Type.Elem != nil &&
+			fieldMember.Type.Elem.Name.Name == "string" {
+			condition = fmt.Sprintf("(item.%s != nil && *item.%s == %q)", fieldname, fieldname, listElems[jsonKey])
+		} else if fieldMember.Type.Name.Name == "string" {
+			condition = fmt.Sprintf("item.%s == %q", fieldname, listElems[jsonKey])
 		} else {
-			conditions = append(conditions, fmt.Sprintf("item.%s == %q", fieldname, listElems[jsonKey]))
+			return FunctionLiteral{}, fmt.Errorf("must be a string or *string, but got type %s", fieldMember.Type.String())
 		}
+		conditions = append(conditions, condition)
 	}
-	matchFuncBody.WriteString(fmt.Sprintf("return %s", strings.Join(conditions, " && ")))
 
+	matchFuncBody.WriteString(fmt.Sprintf("return %s", strings.Join(conditions, " && ")))
 	return FunctionLiteral{
 		Parameters: []ParamResult{{"item", types.PointerTo(elemT)}},
 		Results:    []ParamResult{{"", types.Bool}},
@@ -329,4 +348,30 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 		}},
 	}
 	return doc
+}
+
+func parseListMapKeys(commentLines []string) []string {
+	var keys []string
+	hasListTypeMap := false
+	for _, line := range commentLines {
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "+listType=map" {
+			hasListTypeMap = true
+		}
+		if strings.HasPrefix(trimmedLine, "+listMapKey=") {
+			keyPart := strings.TrimPrefix(trimmedLine, "+listMapKey=")
+			parsedKeys := strings.Split(keyPart, ",")
+			for _, k := range parsedKeys {
+				trimmedKey := strings.TrimSpace(k)
+				if trimmedKey != "" {
+					keys = append(keys, trimmedKey)
+				}
+			}
+		}
+	}
+	if hasListTypeMap && len(keys) > 0 {
+		sort.Strings(keys)
+		return keys
+	}
+	return nil
 }
