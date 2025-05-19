@@ -39,6 +39,6 @@ type Struct struct {
 
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:subfield({"type":"foo","status":"True"})=+k8s:subfield(nestedStruct)=+k8s:required
+	// +k8s:subListMapItem({"type":"foo","status":"True"})=+k8s:subfield(nestedStruct)=+k8s:required
 	Items []Item `json:"items"`
 }

@@ -22,7 +22,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestSubfieldListSimple(t *testing.T) {
+func TestSubListMapItemListSimple(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
@@ -31,7 +31,7 @@ func TestSubfieldListSimple(t *testing.T) {
 			{Type: "OtherType", Status: "False"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {"subfield Conditions[type=Approved]"},
+		`conditions[0]`: {"subListMapItem Conditions[type=Approved]"},
 	})
 
 	st.Value(&Struct{
@@ -39,7 +39,7 @@ func TestSubfieldListSimple(t *testing.T) {
 			{Type: "Approved", Status: "False"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {"subfield Conditions[type=Approved]"},
+		`conditions[0]`: {"subListMapItem Conditions[type=Approved]"},
 	})
 
 	st.Value(&Struct{
@@ -54,8 +54,8 @@ func TestSubfieldListSimple(t *testing.T) {
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		`conditions[0]`: {
-			"subfield Conditions[type=Approved]",
-			"subfield Conditions[status=True,type=Approved]",
+			"subListMapItem Conditions[type=Approved]",
+			"subListMapItem Conditions[status=True,type=Approved]",
 		},
 	})
 
@@ -64,7 +64,7 @@ func TestSubfieldListSimple(t *testing.T) {
 			{Type: "Approved", Status: "OnlyOneEntryNotTwo"},
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		`conditions[0]`: {"subfield Conditions[type=Approved]"},
+		`conditions[0]`: {"subListMapItem Conditions[type=Approved]"},
 	})
 
 	st.Value(&Struct{
@@ -73,8 +73,8 @@ func TestSubfieldListSimple(t *testing.T) {
 		},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		`conditions[0]`: {
-			"subfield Conditions[stringPtr=Target,type=Approved]",
-			"subfield Conditions[type=Approved]"},
+			"subListMapItem Conditions[stringPtr=Target,type=Approved]",
+			"subListMapItem Conditions[type=Approved]"},
 	})
 
 	st.Value(&Struct{

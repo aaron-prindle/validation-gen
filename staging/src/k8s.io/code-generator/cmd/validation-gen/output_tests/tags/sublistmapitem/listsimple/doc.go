@@ -28,9 +28,9 @@ type Struct struct {
 
 	// +listType=map
 	// +listMapKey=type
-	// +k8s:subfield({"type":"Approved"})=+k8s:validateFalse="subfield Conditions[type=Approved]"
-	// +k8s:subfield({"status":"True","type":"Approved"})=+k8s:validateFalse="subfield Conditions[status=True,type=Approved]"
-	// +k8s:subfield({"stringPtr":"Target", "type":"Approved"})=+k8s:validateFalse="subfield Conditions[stringPtr=Target,type=Approved]"
+	// +k8s:subListMapItem({"type":"Approved"})=+k8s:validateFalse="subListMapItem Conditions[type=Approved]"
+	// +k8s:subListMapItem({"status":"True","type":"Approved"})=+k8s:validateFalse="subListMapItem Conditions[status=True,type=Approved]"
+	// +k8s:subListMapItem({"stringPtr":"Target", "type":"Approved"})=+k8s:validateFalse="subListMapItem Conditions[stringPtr=Target,type=Approved]"
 	Conditions []MyCondition `json:"conditions"`
 }
 

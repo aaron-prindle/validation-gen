@@ -23,7 +23,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func TestListComplexSubfield(t *testing.T) {
+func TestListComplexSubListMapItem(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
