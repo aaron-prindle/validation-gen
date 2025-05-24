@@ -84,6 +84,41 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
+// EachMapSliceVal validates each element of each slice value in a map with the
+// specified validation function. This handles types like map[string][]T where
+// each T needs to be validated. The value-type T is assumed to not be nilable.
+func EachMapSliceVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path,
+	newMap, oldMap map[K][]V, validator ValidateFunc[*V]) field.ErrorList {
+	var errs field.ErrorList
+
+	// Get sorted keys for deterministic iteration
+	keys := make([]K, 0, len(newMap))
+	for key := range newMap {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, key := range keys {
+		slice := newMap[key]
+		var oldSlice []V
+		if oldMap != nil {
+			oldSlice = oldMap[key]
+		}
+
+		// Validate each element in the slice
+		for i, val := range slice {
+			var old *V
+			if i < len(oldSlice) {
+				old = &oldSlice[i]
+			}
+			errs = append(errs, validator(ctx, op, fldPath.Key(string(key)).Index(i), &val, old)...)
+		}
+	}
+	return errs
+}
+
 // UniqueByCompare verifies that each element of newSlice is unique.  This
 // function can only be used on types that are directly comparable. For
 // non-comparable types, use UniqueByReflect.

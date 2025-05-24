@@ -223,6 +223,7 @@ func (eachValTagValidator) LateTagValidator() {}
 var (
 	validateEachSliceVal      = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
 	validateEachMapVal        = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachMapSliceVal   = types.Name{Package: libValidationPkg, Name: "EachMapSliceVal"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
@@ -248,6 +249,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payl
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
 	}
+
 	if validations, err := evtv.validator.ExtractValidations(elemContext, fakeComments); err != nil {
 		return Validations{}, err
 	} else {
@@ -263,6 +265,27 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 	case types.Slice, types.Array:
 		return evtv.getListValidations(fldPath, t, validations)
 	case types.Map:
+		// Check if this is a map of slices
+		if t.Elem.Kind == types.Slice {
+			// Check if we have slice-level validations by looking at the functions
+			hasSliceValidations := false
+			hasElementValidations := false
+			for _, vfn := range validations.Functions {
+				funcName := vfn.Function.Name
+				if funcName == "UniqueByCompare" || funcName == "UniqueByReflect" {
+					hasSliceValidations = true
+				} else {
+					hasElementValidations = true
+				}
+			}
+
+			// If we only have slice-level validations, treat it as a regular map
+			if hasSliceValidations && !hasElementValidations {
+				return evtv.getMapValidations(t, validations)
+			}
+			// Otherwise, use the special map-of-slice handling
+			return evtv.getMapOfSliceValidations(t, validations)
+		}
 		return evtv.getMapValidations(t, validations)
 	}
 	return Validations{}, fmt.Errorf("non-iterable type: %v", t)
@@ -272,6 +295,19 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 // a list or map.
 func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
 	return globalEachVal.getValidations(fldPath, t, Validations{Functions: []FunctionGen{fn}})
+}
+
+// ForEachMapSliceVal returns a validation that applies a function to each element
+// of each slice in a map.
+func ForEachMapSliceVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
+	if t.Kind != types.Map || t.Elem.Kind != types.Slice {
+		return Validations{}, fmt.Errorf("ForEachMapSliceVal requires map of slice type, got %v", t)
+	}
+	result := Validations{}
+	result.OpaqueValType = false // We're explicitly handling the values
+	f := Function("eachMapSliceVal", fn.Flags, validateEachMapSliceVal, WrapperFunction{fn, t.Elem.Elem})
+	result.Functions = append(result.Functions, f)
+	return result, nil
 }
 
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
@@ -297,40 +333,49 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	}
 
 	for _, vfn := range validations.Functions {
-		var cmpArg any = Literal("nil")
-		if listMetadata != nil {
-			if listMetadata.declaredAsMap {
-				cmpFn := FunctionLiteral{
-					Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
-					Results:    []ParamResult{{"", types.Bool}},
-				}
-				buf := strings.Builder{}
-				buf.WriteString("return ")
-				// Note: this does not handle pointer fields, which are not
-				// supposed to be used as listMap keys.
-				for i, fld := range listMetadata.keyFields {
-					if i > 0 {
-						buf.WriteString(" && ")
+		// Check if this is a collection-level validation
+		// (e.g., UniqueByCompare from listType=set)
+		isCollectionValidator := false
+		if len(vfn.Args) == 0 && vfn.Function.Package == libValidationPkg {
+			// Functions like UniqueByCompare/UniqueByReflect operate on whole slices
+			// They don't have wrapper args because they were added directly by listType
+			isCollectionValidator = true
+		}
+		
+		if isCollectionValidator {
+			// These functions expect slice arguments, not individual elements
+			// Don't wrap them in EachSliceVal
+			result.Functions = append(result.Functions, vfn)
+		} else {
+			// Regular element validators need the iteration wrapper
+			var cmpArg any = Literal("nil")
+			if listMetadata != nil {
+				if listMetadata.declaredAsMap {
+					cmpFn := FunctionLiteral{
+						Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+						Results:    []ParamResult{{"", types.Bool}},
 					}
-					buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
-				}
-				cmpFn.Body = buf.String()
-				cmpArg = cmpFn
-			} else if listMetadata.declaredAsSet {
-				// Emit the cmpArg as a simple comparison when possible.
-				// Slices and maps are not comparable, and structs might hold
-				// pointer fields, which are directly comparable but not what we need.
-				//
-				// Note: This compares the pointee, not the pointer itself.
-				if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
-					cmpArg = Identifier(validateDirectEqual)
-				} else {
-					cmpArg = Identifier(validateSemanticDeepEqual)
+					buf := strings.Builder{}
+					buf.WriteString("return ")
+					for i, fld := range listMetadata.keyFields {
+						if i > 0 {
+							buf.WriteString(" && ")
+						}
+						buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
+					}
+					cmpFn.Body = buf.String()
+					cmpArg = cmpFn
+				} else if listMetadata.declaredAsSet {
+					if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
+						cmpArg = Identifier(validateDirectEqual)
+					} else {
+						cmpArg = Identifier(validateSemanticDeepEqual)
+					}
 				}
 			}
+			f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, cmpArg, WrapperFunction{vfn, t.Elem})
+			result.Functions = append(result.Functions, f)
 		}
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, cmpArg, WrapperFunction{vfn, t.Elem})
-		result.Functions = append(result.Functions, f)
 	}
 
 	return result, nil
@@ -343,6 +388,50 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	for _, vfn := range validations.Functions {
 		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
+	}
+
+	return result, nil
+}
+
+func (evtv eachValTagValidator) getMapOfSliceValidations(t *types.Type, validations Validations) (Validations, error) {
+	result := Validations{}
+	result.OpaqueValType = validations.OpaqueType
+
+	// For map[string][]T
+	sliceType := t.Elem             // This is []T
+	sliceElemType := sliceType.Elem // This is T
+
+	for _, vfn := range validations.Functions {
+		// The key insight: check what type the validation expects
+		// Collection validators expect []T arguments
+		// Element validators expect *T arguments
+[p=]
+		// Most validators are wrapped, so check if we have a wrapper
+		isCollectionValidator := false
+
+		// Look at the function signature to determine what it expects
+		// Collection validators will have been generated expecting slice types
+		if len(vfn.Args) > 0 {
+			// Check if the validation was generated for a slice type
+			// This happens when listType=set generates UniqueByCompare/Reflect
+			switch arg := vfn.Args[0].(type) {
+			case WrapperFunction:
+				// If the wrapper's ObjType is a slice, it's a collection validator
+				isCollectionValidator = arg.ObjType != nil && arg.ObjType.Kind == types.Slice
+			}
+		}
+
+		if isCollectionValidator {
+			// This validation operates on whole slices
+			// Use EachMapVal to iterate over map values (which are slices)
+			f := Function(eachValTagName, vfn.Flags, validateEachMapVal, vfn.Args...)
+			result.Functions = append(result.Functions, f)
+		} else {
+			// This validation operates on individual elements
+			// Use EachMapSliceVal to iterate over elements within slices
+			f := Function(eachValTagName, vfn.Flags, validateEachMapSliceVal, WrapperFunction{vfn, sliceElemType})
+			result.Functions = append(result.Functions, f)
+		}
 	}
 
 	return result, nil
@@ -391,7 +480,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, _ []string, payl
 	fakeComments := []string{payload}
 	elemContext := Context{
 		Scope:  ScopeMapKey,
-		Type:   t.Elem,
+		Type:   t.Key,
 		Parent: t,
 		Path:   context.Path.Child("(keys)"),
 	}
