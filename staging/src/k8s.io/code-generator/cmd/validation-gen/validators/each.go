@@ -248,18 +248,8 @@ func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payl
 		elemContext.Scope = ScopeListVal
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
-		// Special handling for maps of slices
-		if t.Elem.Kind == types.Slice {
-			// For map[string][]T, we need to get validations for T, not []T
-			sliceElem := t.Elem.Elem
-			elemContext = Context{
-				Scope:  ScopeListVal, // Elements within the slice
-				Type:   sliceElem,
-				Parent: t.Elem,
-				Path:   context.Path.Key("*").Index(0),
-			}
-		}
 	}
+
 	if validations, err := evtv.validator.ExtractValidations(elemContext, fakeComments); err != nil {
 		return Validations{}, err
 	} else {
