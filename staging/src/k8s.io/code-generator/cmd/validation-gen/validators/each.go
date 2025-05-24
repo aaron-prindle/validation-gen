@@ -104,9 +104,13 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 		//
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 		if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
-			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
+			return Validations{Functions: []FunctionGen{
+				Function(listTypeTagName, DefaultFlags, validateUniqueByCompare).WithLevel(ValidationLevelCollection),
+			}}, nil
 		}
-		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByReflect)}}, nil
+		return Validations{Functions: []FunctionGen{
+			Function(listTypeTagName, DefaultFlags, validateUniqueByReflect).WithLevel(ValidationLevelCollection),
+		}}, nil
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
 		if NativeType(t.Elem).Kind != types.Struct {
@@ -223,6 +227,7 @@ func (eachValTagValidator) LateTagValidator() {}
 var (
 	validateEachSliceVal      = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
 	validateEachMapVal        = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachMapSliceVal   = types.Name{Package: libValidationPkg, Name: "EachMapSliceVal"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
@@ -248,6 +253,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payl
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
 	}
+
 	if validations, err := evtv.validator.ExtractValidations(elemContext, fakeComments); err != nil {
 		return Validations{}, err
 	} else {
@@ -263,6 +269,10 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 	case types.Slice, types.Array:
 		return evtv.getListValidations(fldPath, t, validations)
 	case types.Map:
+		// Check if this is a map of slices
+		if t.Elem.Kind == types.Slice {
+			return evtv.getMapOfSliceValidations(t, validations)
+		}
 		return evtv.getMapValidations(t, validations)
 	}
 	return Validations{}, fmt.Errorf("non-iterable type: %v", t)
@@ -272,6 +282,19 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 // a list or map.
 func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
 	return globalEachVal.getValidations(fldPath, t, Validations{Functions: []FunctionGen{fn}})
+}
+
+// ForEachMapSliceVal returns a validation that applies a function to each element
+// of each slice in a map.
+func ForEachMapSliceVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
+	if t.Kind != types.Map || t.Elem.Kind != types.Slice {
+		return Validations{}, fmt.Errorf("ForEachMapSliceVal requires map of slice type, got %v", t)
+	}
+	result := Validations{}
+	f := Function("eachMapSliceVal", fn.Flags, validateEachMapSliceVal, WrapperFunction{fn, t.Elem.Elem})
+	f.Level = ValidationLevelElement
+	result.Functions = append(result.Functions, f)
+	return result, nil
 }
 
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
@@ -348,6 +371,46 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	return result, nil
 }
 
+func (evtv eachValTagValidator) getMapOfSliceValidations(t *types.Type, validations Validations) (Validations, error) {
+	result := Validations{}
+	result.OpaqueValType = validations.OpaqueType
+
+	// For map[string][]T, we need to handle different validation levels
+	sliceType := t.Elem             // This is []T
+	sliceElemType := sliceType.Elem // This is T
+
+	for _, vfn := range validations.Functions {
+		// Special handling: if this function is already EachSliceVal from nested eachVal,
+		// we should not wrap it again. The nested eachVal already handles slice iteration.
+		if vfn.Function.Name == "EachSliceVal" {
+			// This means we had +k8s:eachVal=+k8s:eachVal=...
+			// The inner eachVal already set up slice iteration
+			// We just need to wrap for map iteration using EachMapVal
+			f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, sliceType})
+			f.Level = ValidationLevelCollection // It operates on whole slices
+			result.Functions = append(result.Functions, f)
+			continue
+		}
+
+		switch vfn.Level {
+		case ValidationLevelCollection:
+			// Collection-level validations operate on the slice itself
+			// Use EachMapVal to iterate over map values (slices)
+			f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, sliceType})
+			f.Level = ValidationLevelCollection
+			result.Functions = append(result.Functions, f)
+		case ValidationLevelElement:
+			// Element-level validations operate on individual elements
+			// Use EachMapSliceVal to iterate over elements within slices
+			f := Function(eachValTagName, vfn.Flags, validateEachMapSliceVal, WrapperFunction{vfn, sliceElemType})
+			f.Level = ValidationLevelElement
+			result.Functions = append(result.Functions, f)
+		}
+	}
+
+	return result, nil
+}
+
 func (evtv eachValTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:         evtv.TagName(),
@@ -391,7 +454,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, _ []string, payl
 	fakeComments := []string{payload}
 	elemContext := Context{
 		Scope:  ScopeMapKey,
-		Type:   t.Elem,
+		Type:   t.Key,
 		Parent: t,
 		Path:   context.Path.Child("(keys)"),
 	}

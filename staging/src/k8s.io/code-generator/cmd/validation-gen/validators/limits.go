@@ -125,7 +125,7 @@ func (maxItemsTagValidator) GetValidations(context Context, _ []string, payload 
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
 	// Note: maxItems short-circuits other validations.
-	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal))
+	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal).WithLevel(ValidationLevelElement))
 	return result, nil
 }
 
