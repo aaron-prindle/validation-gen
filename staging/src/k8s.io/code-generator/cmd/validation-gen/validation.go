@@ -567,6 +567,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 
 // discoverStruct walks a struct type recursively.
 // discoverStruct walks a struct type recursively.
+// discoverStruct walks a struct type recursively.
 func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path) error {
 	var fields []*childNode
 
@@ -729,42 +730,29 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the field is marked as opaque, we can treat it as it is
 				// were in a non-included package.
 			} else {
-				// If the map's value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// Save the iteration validation while we have all the
-					// information we need. Later we can check if we
-					// actually need it.
-					//
-					// Note: the first argument to Function() is really
-					// only for debugging.
-					v, err := validators.ForEachVal(childPath, childType,
-						validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
-					if err != nil {
-						return fmt.Errorf("generating map value iteration: %w", err)
-					} else {
-						child.fieldValIterations.Add(v)
-					}
-				}
-
-				// Handle maps of slices - check if the value is a slice and if its elements have validations
+				// Handle maps of slices specially
 				if child.node.elem.childType.Kind == types.Slice {
-					sliceElemNode := child.node.elem.node.elem
-					if sliceElemNode != nil && sliceElemNode.node != nil {
-						// Check for opaque type on the slice elements
-						if !child.fieldValidations.OpaqueValType {
-							// If the slice element type is a named type with validations
-							if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
-								// This is a map[string][]T where T has a validation function
-								// We need to generate a special iteration that handles both levels
-								v, err := validators.ForEachMapSliceVal(childPath, childType,
-									validators.Function("iterateMapOfSliceValues", validators.DefaultFlags, funcName))
-								if err != nil {
-									return fmt.Errorf("generating map of slice iteration: %w", err)
-								} else {
-									child.fieldValIterations.Add(v)
-								}
-							}
+					// This is a map[string][]T
+					// The validations from eachVal tags are already handled above
+					// We don't need to add ForEachMapSliceVal here because:
+					// 1. If there are element-level validations, they'll be handled by the eachVal processing
+					// 2. If there are slice-level validations (like listType=set), they're handled as regular map validations
+					// 3. The emitValidationForChild will check if slice elements have their own type validations
+				} else {
+					// Regular map value handling
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// Save the iteration validation while we have all the
+						// information we need. Later we can check if we
+						// actually need it.
+						//
+						// Note: the first argument to Function() is really
+						// only for debugging.
+						v, err := validators.ForEachVal(childPath, childType,
+							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+						if err != nil {
+							return fmt.Errorf("generating map value iteration: %w", err)
+						} else {
+							child.fieldValIterations.Add(v)
 						}
 					}
 				}
@@ -961,6 +949,15 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 // named "fldPath".
 //
 // This function assumes that thisChild.node is not nil.
+// emitValidationForChild emits code for the specified childNode, calling
+// type-attached validations and then descending into the type (e.g. struct
+// fields).
+//
+// Emitted code assumes that the value in question is always a pair of nilable
+// variables named "obj" and "oldObj", and the field path to this value is
+// named "fldPath".
+//
+// This function assumes that thisChild.node is not nil.
 func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild *childNode, sw *generator.SnippetWriter) {
 	thisNode := thisChild.node
 	inType := thisNode.valueType
@@ -1089,23 +1086,54 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					}
 
 					// Special handling for maps of slices
+					// Special handling for maps of slices
 					if fld.node.elem.node != nil && fld.node.elem.childType.Kind == types.Slice {
 						sliceElemNode := fld.node.elem.node.elem
 						if sliceElemNode != nil && sliceElemNode.node != nil && g.hasValidations(sliceElemNode.node) {
 							// We have a map[string][]T where T has validations
-							// Need to emit code that iterates both the map and the inner slices
-							emitComments([]string{"Validate elements of slice values in map"}, bufsw)
-							if !fldRatchetingChecked {
-								emitRatchetingCheck(c, fld.childType, bufsw)
-								fldRatchetingChecked = true
+							// Check if we already have validations from fieldValIterations that handle this
+							// (e.g., from ForEachMapSliceVal added during discovery)
+							alreadyHandled := false
+							for _, v := range fld.fieldValIterations.Functions {
+								if v.Function.Name == "EachMapSliceVal" {
+									alreadyHandled = true
+									break
+								}
 							}
-							// Generate a special iteration that handles map[string][]T
-							// This follows the pattern of calling validation functions from the validate package
-							targs := targs.WithArgs(generator.Args{
-								"funcName": c.Universe.Type(sliceElemNode.node.funcName),
-								"validate": mkSymbolArgs(c, validatePkgSymbols),
-							})
-							bufsw.Do("errs = append(errs, $.validate.EachMapSliceVal|raw$(ctx, op, fldPath, obj, oldObj, $.funcName|raw$)...)\n", targs)
+
+							if !alreadyHandled {
+								// Emit direct call to validate slice elements
+								emitComments([]string{"Validate elements of slice values in map"}, bufsw)
+								if !fldRatchetingChecked {
+									emitRatchetingCheck(c, fld.childType, bufsw)
+									fldRatchetingChecked = true
+								}
+
+								// Generate call to EachMapSliceVal
+								targs := targs.WithArgs(generator.Args{
+									"funcName":  c.Universe.Type(sliceElemNode.node.funcName),
+									"validate":  mkSymbolArgs(c, validatePkgSymbols),
+									"elemType":  sliceElemNode.childType,
+									"context":   mkSymbolArgs(c, contextPkgSymbols),
+									"operation": mkSymbolArgs(c, operationPkgSymbols),
+								})
+
+								// Check if the element validation function expects pointers
+								if isNilableType(sliceElemNode.childType) {
+									// Element type is already nilable
+									bufsw.Do("errs = append(errs, $.validate.EachMapSliceVal|raw$(ctx, op, fldPath, obj, oldObj, $.funcName|raw$)...)\n", targs)
+								} else {
+									// Need wrapper to handle pointer conversion
+									bufsw.Do("errs = append(errs, $.validate.EachMapSliceVal|raw$(ctx, op, fldPath, obj, oldObj, ", targs)
+									bufsw.Do("func(ctx $.context.Context|raw$, op $.operation.Operation|raw$, fldPath *$.field.Path|raw$, obj, oldObj *$.elemType|raw$) $.field.ErrorList|raw$ {\n", targs)
+									bufsw.Do("    if obj == nil { return nil }\n", nil)
+									bufsw.Do("    if oldObj == nil {\n", nil)
+									bufsw.Do("        return $.funcName|raw$(ctx, op, fldPath, *obj, $.elemType|raw${})\n", targs)
+									bufsw.Do("    }\n", nil)
+									bufsw.Do("    return $.funcName|raw$(ctx, op, fldPath, *obj, *oldObj)\n", targs)
+									bufsw.Do("})...)\n", nil)
+								}
+							}
 						}
 					}
 

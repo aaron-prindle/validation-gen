@@ -52,7 +52,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapSliceVal(ctx, op, fldPath, obj, oldObj, validate.UniqueByCompare)...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.UniqueByCompare)...)
 			return
 		}(fldPath.Child("uniqueValues"), obj.UniqueValues, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]string { return oldObj.UniqueValues }))...)
 
@@ -62,7 +62,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapSliceVal(ctx, op, fldPath, obj, oldObj, validate.UniqueByCompare)...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.UniqueByCompare)...)
 			return
 		}(fldPath.Child("uniqueInts"), obj.UniqueInts, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]int { return oldObj.UniqueInts }))...)
 

@@ -93,9 +93,16 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element")
 				})
 			})...)
-			errs = append(errs, validate.EachMapSliceVal(ctx, op, fldPath, obj, oldObj, Validate_ComplexValue)...)
 			// Validate elements of slice values in map
-			errs = append(errs, validate.EachMapSliceVal(ctx, op, fldPath, obj, oldObj, Validate_ComplexValue)...)
+			errs = append(errs, validate.EachMapSliceVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComplexValue) field.ErrorList {
+				if obj == nil {
+					return nil
+				}
+				if oldObj == nil {
+					return Validate_ComplexValue(ctx, op, fldPath, *obj, ComplexValue{})
+				}
+				return Validate_ComplexValue(ctx, op, fldPath, *obj, *oldObj)
+			})...)
 			return
 		}(fldPath.Child("complexMap"), obj.ComplexMap, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]ComplexValue { return oldObj.ComplexMap }))...)
 
