@@ -234,6 +234,11 @@ func unalias(t *types.Type) *types.Type {
 // definition and discovering a field of a struct.  The first time it
 // encounters a type it has not seen before, it will explore that type. If it
 // finds a type it has already processed, it will return the existing node.
+// discoverType walks the given type recursively and returns a typeNode
+// representing it. This does not distinguish between discovering a type
+// definition and discovering a field of a struct.  The first time it
+// encounters a type it has not seen before, it will explore that type. If it
+// finds a type it has already processed, it will return the existing node.
 func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typeNode, error) {
 	// With the exception of builtins (which gengo puts in package ""), we
 	// can't traverse into packages which are not being processed by this tool.
@@ -289,10 +294,21 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
-		// case types.Slice:
-		// 	if unalias(elem.Elem) != types.Byte {
-		// 		return nil, fmt.Errorf("field %s (%s): maps of lists are not supported", fldPath.String(), t)
-		// 	}
+		case types.Slice:
+			// Maps of slices are now supported!
+			// Still need to check that the slice doesn't contain unsupported types
+			sliceElem := unalias(elem.Elem)
+			switch sliceElem.Kind {
+			case types.Pointer:
+				return nil, fmt.Errorf("field %s (%s): maps of lists of pointers are not supported", fldPath.String(), t)
+			case types.Slice:
+				if unalias(sliceElem.Elem) != types.Byte {
+					return nil, fmt.Errorf("field %s (%s): maps of lists of lists are not supported", fldPath.String(), t)
+				}
+			case types.Map:
+				return nil, fmt.Errorf("field %s (%s): maps of lists of maps are not supported", fldPath.String(), t)
+			}
+			// If we get here, the map of slice is allowed
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): maps of maps are not supported", fldPath.String(), t)
 		}
@@ -521,6 +537,24 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 							thisNode.typeValIterations.Add(v)
 						}
 					}
+
+					// Handle typedef to map of slices
+					if underlying.node.elem.childType.Kind == types.Slice {
+						sliceElemNode := underlying.node.elem.node.elem
+						if sliceElemNode != nil && sliceElemNode.node != nil {
+							// If the slice element type is a named type with validations
+							if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
+								// This is a typedef to map[string][]T where T has a validation function
+								v, err := validators.ForEachMapSliceVal(fldPath, underlying.childType,
+									validators.Function("iterateMapOfSliceValues", validators.DefaultFlags, funcName))
+								if err != nil {
+									return nil, fmt.Errorf("generating map of slice iteration: %w", err)
+								} else {
+									thisNode.typeValIterations.Add(v)
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -529,6 +563,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	return thisNode, nil
 }
 
+// discoverStruct walks a struct type recursively.
 // discoverStruct walks a struct type recursively.
 func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path) error {
 	var fields []*childNode
@@ -707,6 +742,28 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 						return fmt.Errorf("generating map value iteration: %w", err)
 					} else {
 						child.fieldValIterations.Add(v)
+					}
+				}
+
+				// Handle maps of slices - check if the value is a slice and if its elements have validations
+				if child.node.elem.childType.Kind == types.Slice {
+					sliceElemNode := child.node.elem.node.elem
+					if sliceElemNode != nil && sliceElemNode.node != nil {
+						// Check for opaque type on the slice elements
+						if !child.fieldValidations.OpaqueValType {
+							// If the slice element type is a named type with validations
+							if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
+								// This is a map[string][]T where T has a validation function
+								// We need to generate a special iteration that handles both levels
+								v, err := validators.ForEachMapSliceVal(childPath, childType,
+									validators.Function("iterateMapOfSliceValues", validators.DefaultFlags, funcName))
+								if err != nil {
+									return fmt.Errorf("generating map of slice iteration: %w", err)
+								} else {
+									child.fieldValIterations.Add(v)
+								}
+							}
+						}
 					}
 				}
 			}
@@ -893,6 +950,15 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 // named "fldPath".
 //
 // This function assumes that thisChild.node is not nil.
+// emitValidationForChild emits code for the specified childNode, calling
+// type-attached validations and then descending into the type (e.g. struct
+// fields).
+//
+// Emitted code assumes that the value in question is always a pair of nilable
+// variables named "obj" and "oldObj", and the field path to this value is
+// named "fldPath".
+//
+// This function assumes that thisChild.node is not nil.
 func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild *childNode, sw *generator.SnippetWriter) {
 	thisNode := thisChild.node
 	inType := thisNode.valueType
@@ -1019,6 +1085,28 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 						}
 						emitCallsToValidators(c, validations.Functions, bufsw)
 					}
+
+					// Special handling for maps of slices
+					if fld.node.elem.node != nil && fld.node.elem.childType.Kind == types.Slice {
+						sliceElemNode := fld.node.elem.node.elem
+						if sliceElemNode != nil && sliceElemNode.node != nil && g.hasValidations(sliceElemNode.node) {
+							// We have a map[string][]T where T has validations
+							// Need to emit code that iterates both the map and the inner slices
+							emitComments([]string{"Validate elements of slice values in map"}, bufsw)
+							if !fldRatchetingChecked {
+								emitRatchetingCheck(c, fld.childType, bufsw)
+								fldRatchetingChecked = true
+							}
+							// Generate a special iteration that handles map[string][]T
+							// This will need a custom validator function that can handle the nested iteration
+							targs := targs.WithArgs(generator.Args{
+								"funcName": c.Universe.Type(sliceElemNode.node.funcName),
+								"validate": mkSymbolArgs(c, []types.Name{{Package: libValidationPkg, Name: "EachMapSliceVal"}}),
+							})
+							bufsw.Do("errs = append(errs, $.validate.EachMapSliceVal|raw$(ctx, op, fldPath, obj, oldObj, $.funcName|raw$)...)\n", targs)
+						}
+					}
+
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
 				default:
