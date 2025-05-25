@@ -321,16 +321,27 @@ type Identifier types.Name
 type PrivateVar types.Name
 
 // Function creates a FunctionGen for a given function name and extraArgs.
+// Update the Function helper to default to element level
 func Function(tagName string, flags FunctionFlags, function types.Name, extraArgs ...any) FunctionGen {
 	return FunctionGen{
 		TagName:  tagName,
 		Flags:    flags,
 		Function: function,
 		Args:     extraArgs,
+		Level:    ValidationLevelElement, // Default to element level
 	}
 }
 
-// FunctionGen describes a function call that should be generated.
+// Add these constants and types after the existing FunctionFlags constants
+const (
+	// ValidationLevel indicates what level a validation operates at
+	ValidationLevelElement ValidationLevel = iota
+	ValidationLevelCollection
+)
+
+type ValidationLevel int
+
+// Update FunctionGen struct - add Level field
 type FunctionGen struct {
 	// TagName is the tag which triggered this function.
 	TagName string
@@ -341,30 +352,26 @@ type FunctionGen struct {
 	// Function is the name of the function to call.
 	Function types.Name
 
-	// Args holds arguments to pass to the function, and may conatin:
-	// - data literals comprised of maps, slices, strings, ints, floats, and bools
-	// - types.Type (to reference any type in the universe)
-	// - types.Member (to reference members of the current value)
-	// - types.Identifier (to reference any identifier in the universe)
-	// - validators.WrapperFunction (to call another validation function)
-	// - validators.Literal (to pass a literal value)
-	// - validators.FunctionLiteral (to pass a function literal)
-	// - validators.PrivateVar (to reference a variable)
-	//
-	// See toGolangSourceDataLiteral for details.
+	// Args holds arguments to pass to the function
 	Args []any
 
-	// TypeArgs assigns types to the type parameters of the function, for
-	// generic function calls which require explicit type arguments.
+	// TypeArgs assigns types to the type parameters of the function
 	TypeArgs []types.Name
 
-	// Conditions holds any conditions that must true for a field to be
-	// validated by this function.
+	// Conditions holds any conditions that must true for a field to be validated
 	Conditions Conditions
 
-	// Comments holds optional comments that should be added to the generated
-	// code (without the leading "//").
+	// Comments holds optional comments that should be added to the generated code
 	Comments []string
+
+	// Level indicates whether this validation operates on elements or collections
+	Level ValidationLevel
+}
+
+// Add helper method after the existing With* methods
+func (fg FunctionGen) WithLevel(level ValidationLevel) FunctionGen {
+	fg.Level = level
+	return fg
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
