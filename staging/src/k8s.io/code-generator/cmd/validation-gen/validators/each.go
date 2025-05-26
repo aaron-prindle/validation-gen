@@ -223,6 +223,7 @@ func (eachValTagValidator) LateTagValidator() {}
 var (
 	validateEachSliceVal      = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
 	validateEachMapVal        = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
+	validateEachMapSliceVal   = types.Name{Package: libValidationPkg, Name: "EachMapSliceVal"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
 	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
@@ -272,6 +273,18 @@ func (evtv eachValTagValidator) getValidations(fldPath *field.Path, t *types.Typ
 // a list or map.
 func ForEachVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
 	return globalEachVal.getValidations(fldPath, t, Validations{Functions: []FunctionGen{fn}})
+}
+
+// ForEachMapSliceVal returns a validation that applies a function to each element
+// of each slice in a map.
+func ForEachMapSliceVal(fldPath *field.Path, t *types.Type, fn FunctionGen) (Validations, error) {
+	if t.Kind != types.Map || t.Elem.Kind != types.Slice {
+		return Validations{}, fmt.Errorf("ForEachMapSliceVal requires map of slice type, got %v", t)
+	}
+	result := Validations{}
+	f := Function("eachMapSliceVal", fn.Flags, validateEachMapSliceVal, WrapperFunction{fn, t.Elem.Elem})
+	result.Functions = append(result.Functions, f)
+	return result, nil
 }
 
 func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types.Type, validations Validations) (Validations, error) {
@@ -341,8 +354,24 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	result.OpaqueValType = validations.OpaqueType
 
 	for _, vfn := range validations.Functions {
-		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
-		result.Functions = append(result.Functions, f)
+		// Special case: nested eachVal on map of slices
+		if t.Elem.Kind == types.Slice && vfn.TagName == eachValTagName {
+			// This is iterating into slice elements
+			// The vfn already contains the processed validations for elements
+			// We need to extract the actual element validator from the wrapper
+			if len(vfn.Args) > 1 {
+				if wrapper, ok := vfn.Args[1].(WrapperFunction); ok {
+					// Create a new function that uses EachMapSliceVal
+					f := Function(eachValTagName, wrapper.Function.Flags, validateEachMapSliceVal,
+						WrapperFunction{wrapper.Function, t.Elem.Elem})
+					result.Functions = append(result.Functions, f)
+				}
+			}
+		} else {
+			// Regular case - validate the map values
+			f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
+			result.Functions = append(result.Functions, f)
+		}
 	}
 
 	return result, nil
