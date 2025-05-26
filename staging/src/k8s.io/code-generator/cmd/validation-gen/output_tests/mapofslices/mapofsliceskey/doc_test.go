@@ -133,7 +133,7 @@ func TestMapOfSlicesKey(t *testing.T) {
 		}
 
 		// Build expected errors
-		expectedErrors := []any{
+		expectedErrors := []*field.Error{
 			field.Invalid(nil, obj, "forced failure: type TestStruct"),
 			field.Invalid(field.NewPath("structSliceKeys"), "toomany", "forced failure: key StructSliceKeys"),
 			field.TooMany(field.NewPath("structSliceKeys").Key("toomany"), 6, 5),

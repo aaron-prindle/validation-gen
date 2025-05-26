@@ -353,26 +353,59 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	result := Validations{}
 	result.OpaqueValType = validations.OpaqueType
 
+	// Special handling for maps of slices
+	if t.Elem.Kind == types.Slice {
+		return evtv.getMapOfSliceValidations(t, validations)
+	}
+
+	// Existing logic for non-slice map values
 	for _, vfn := range validations.Functions {
-		// Special case: nested eachVal on map of slices
-		if t.Elem.Kind == types.Slice && vfn.TagName == eachValTagName {
-			// This is iterating into slice elements
-			// The vfn already contains the processed validations for elements
-			// We need to extract the actual element validator from the wrapper
-			if len(vfn.Args) > 1 {
+		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
+		result.Functions = append(result.Functions, f)
+	}
+
+	return result, nil
+}
+
+// In validators/each.go - update getMapOfSliceValidations
+func (evtv eachValTagValidator) getMapOfSliceValidations(t *types.Type, validations Validations) (Validations, error) {
+	result := Validations{}
+	result.OpaqueValType = validations.OpaqueType
+
+	// Separate slice-level from element-level validations
+	sliceValidations := Validations{}
+	elementValidations := Validations{}
+
+	for _, vfn := range validations.Functions {
+		if vfn.TagName == eachValTagName && len(vfn.Args) > 0 {
+			// This is a nested eachVal - it applies to elements
+			if vfn.Function.Name == "EachSliceVal" && len(vfn.Args) > 1 {
+				// Extract the actual element validator
 				if wrapper, ok := vfn.Args[1].(WrapperFunction); ok {
-					// Create a new function that uses EachMapSliceVal
-					f := Function(eachValTagName, wrapper.Function.Flags, validateEachMapSliceVal,
-						WrapperFunction{wrapper.Function, t.Elem.Elem})
-					result.Functions = append(result.Functions, f)
+					elementValidations.Functions = append(elementValidations.Functions, wrapper.Function)
 				}
+			} else {
+				elementValidations.Functions = append(elementValidations.Functions, vfn)
 			}
+		} else if isSliceLevelValidation(vfn) {
+			// This applies to the slice itself
+			sliceValidations.Functions = append(sliceValidations.Functions, vfn)
 		} else {
-			// Regular case - validate the map values
-			f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
-			result.Functions = append(result.Functions, f)
+			// Default: treat as element validation
+			elementValidations.Functions = append(elementValidations.Functions, vfn)
 		}
 	}
+
+	// Create a special validator that EachMapVal will pass through
+	// Don't wrap it in WrapperFunction - instead put all the info in Args
+	f := Function(eachValTagName, DefaultFlags, validateEachMapVal,
+		MapSliceValidationSpec{
+			SliceValidations:   sliceValidations.Functions,
+			ElementValidations: elementValidations.Functions,
+			ElementType:        t.Elem.Elem,
+			SliceType:          t.Elem,
+		})
+	result.Functions = append(result.Functions, f)
 
 	return result, nil
 }
@@ -462,4 +495,38 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 		}},
 	}
 	return doc
+}
+
+func isSliceLevelValidation(fn FunctionGen) bool {
+	// Validations that apply to the slice itself, not its elements
+	sliceLevelValidations := map[types.Name]bool{
+		{Package: libValidationPkg, Name: "MaxItems"}: true,
+		{Package: libValidationPkg, Name: "MinItems"}: true,
+		// Add any other slice-level validations here
+	}
+	return sliceLevelValidations[fn.Function]
+}
+
+// Add to validators/validators.go
+type MapSliceValidationSpec struct {
+	SliceValidations   []FunctionGen
+	ElementValidations []FunctionGen
+	ElementType        *types.Type
+	SliceType          *types.Type // The full slice type (e.g., []string)
+}
+
+// Update createSliceValidatorWrapper
+func createSliceValidatorWrapper(sliceValidations, elementValidations Validations, elemType *types.Type) FunctionGen {
+	return FunctionGen{
+		TagName:  eachValTagName,
+		Flags:    DefaultFlags,
+		Function: types.Name{Package: "SPECIAL", Name: "inlineSliceValidator"},
+		Args: []any{
+			MapSliceValidationSpec{
+				SliceValidations:   sliceValidations.Functions,
+				ElementValidations: elementValidations.Functions,
+				ElementType:        elemType,
+			},
+		},
+	}
 }

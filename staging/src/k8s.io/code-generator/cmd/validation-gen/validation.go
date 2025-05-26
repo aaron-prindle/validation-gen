@@ -693,10 +693,20 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			// Validate each value of a map field.
 			if elemNode := child.node.elem.node; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
-					return fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						childPath, childType.Elem.String())
+					// Special handling for maps of slices
+					if child.node.elem.childType.Kind == types.Slice {
+						// Check if the slice element type is opaque
+						sliceElemType := child.node.elem.childType.Elem
+						return fmt.Errorf("%v: value type %v (slice element type %v) is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							childPath, childType.Elem.String(), sliceElemType.String())
+					} else {
+						return fmt.Errorf("%v: value type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							childPath, childType.Elem.String())
+					}
 				}
 			} else if child.fieldValidations.OpaqueValType {
 				// If the field is marked as opaque, we can treat it as it is
@@ -724,27 +734,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					// The validations will still be applied if there are field-level validations
 				}
 
-				// Handle maps of slices - check if the value is a slice and if its elements have validations
-				if child.node.elem.childType.Kind == types.Slice {
-					sliceElemNode := child.node.elem.node.elem
-					if sliceElemNode != nil && sliceElemNode.node != nil {
-						// Check for opaque type on the slice elements
-						if !child.fieldValidations.OpaqueValType {
-							// If the slice element type is a named type with validations
-							if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
-								// This is a map[string][]T where T has a validation function
-								// We need to generate a special iteration that handles both levels
-								v, err := validators.ForEachMapSliceVal(childPath, childType,
-									validators.Function("iterateMapOfSliceValues", validators.DefaultFlags, funcName))
-								if err != nil {
-									return fmt.Errorf("generating map of slice iteration: %w", err)
-								} else {
-									child.fieldValIterations.Add(v)
-								}
-							}
-						}
-					}
-				}
+				// Note: We no longer need special handling for maps of slices here.
+				// The eachVal validator will detect map[K][]V and handle it appropriately
+				// by generating the proper nested validation calls.
 			}
 		}
 
@@ -1184,6 +1176,15 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 	validations = sort(validations)
 
 	for _, v := range validations {
+		// Special handling for map of slice validators
+		// Check if this is EachMapVal with a MapSliceValidationSpec argument
+		if v.Function.Name == "EachMapVal" && len(v.Args) == 1 {
+			if spec, ok := v.Args[0].(validators.MapSliceValidationSpec); ok {
+				emitMapSliceValidator(c, v, spec, sw)
+				continue
+			}
+		}
+
 		isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
 		isNonError := v.Flags.IsSet(validators.NonError)
 
@@ -1262,6 +1263,120 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			}
 		}
 	}
+}
+
+func emitMapSliceValidator(c *generator.Context, v validators.FunctionGen, spec validators.MapSliceValidationSpec, sw *generator.SnippetWriter) {
+	targs := generator.Args{
+		"field":     mkSymbolArgs(c, fieldPkgSymbols),
+		"context":   mkSymbolArgs(c, contextPkgSymbols),
+		"operation": mkSymbolArgs(c, operationPkgSymbols),
+		"validate":  mkSymbolArgs(c, mkPkgNames(validatePkg, "EachMapVal", "EachSliceVal")),
+		"elemType":  spec.ElementType,
+		"sliceType": spec.SliceType,
+	}
+
+	// Generate the EachMapVal call with an inline validator
+	sw.Do("errs = append(errs, $.validate.EachMapVal|raw$(ctx, op, fldPath, obj, oldObj,\n", targs)
+	sw.Do("    func(ctx $.context.Context|raw$, op $.operation.Operation|raw$, fldPath *$.field.Path|raw$, obj, oldObj *$.sliceType|raw$) $.field.ErrorList|raw$ {\n", targs)
+	sw.Do("        var errs $.field.ErrorList|raw$\n", targs)
+	sw.Do("        if obj == nil {\n", nil)
+	sw.Do("            return nil\n", nil)
+	sw.Do("        }\n", nil)
+
+	// Dereference for slice-level validations
+	sw.Do("        slice := *obj\n", nil)
+	sw.Do("        var oldSlice $.sliceType|raw$\n", targs)
+	sw.Do("        if oldObj != nil {\n", nil)
+	sw.Do("            oldSlice = *oldObj\n", nil)
+	sw.Do("        }\n", nil)
+
+	// Emit slice-level validations
+	if len(spec.SliceValidations) > 0 {
+		sw.Do("        // Slice-level validations\n", nil)
+		for _, sv := range spec.SliceValidations {
+			isShortCircuit := sv.Flags.IsSet(validators.ShortCircuit)
+			isNonError := sv.Flags.IsSet(validators.NonError)
+
+			svTargs := generator.Args{
+				"funcName": c.Universe.Type(sv.Function),
+			}
+
+			// Generate the validation call
+			if isShortCircuit {
+				sw.Do("        if e := $.funcName|raw$(ctx, op, fldPath, slice, oldSlice", svTargs)
+				for _, arg := range sv.Args {
+					sw.Do(", ", nil)
+					toGolangSourceDataLiteral(sw, c, arg)
+				}
+				sw.Do("); len(e) != 0 {\n", nil)
+				if !isNonError {
+					sw.Do("            errs = append(errs, e...)\n", nil)
+				}
+				sw.Do("            return errs // do not proceed\n", nil)
+				sw.Do("        }\n", nil)
+			} else {
+				if !isNonError {
+					sw.Do("        errs = append(errs, $.funcName|raw$(ctx, op, fldPath, slice, oldSlice", svTargs)
+					for _, arg := range sv.Args {
+						sw.Do(", ", nil)
+						toGolangSourceDataLiteral(sw, c, arg)
+					}
+					sw.Do(")...)\n", nil)
+				} else {
+					sw.Do("        $.funcName|raw$(ctx, op, fldPath, slice, oldSlice", svTargs)
+					for _, arg := range sv.Args {
+						sw.Do(", ", nil)
+						toGolangSourceDataLiteral(sw, c, arg)
+					}
+					sw.Do(")\n", nil)
+				}
+			}
+		}
+	}
+
+	// Emit element validations if any
+	if len(spec.ElementValidations) > 0 {
+		sw.Do("        // Element validations\n", nil)
+		sw.Do("        errs = append(errs, $.validate.EachSliceVal|raw$(ctx, op, fldPath, slice, oldSlice, nil, ", targs)
+
+		// Generate the element validator
+		if len(spec.ElementValidations) == 1 {
+			ev := spec.ElementValidations[0]
+			// Always generate an inline function to handle the arguments properly
+			sw.Do("func(ctx $.context.Context|raw$, op $.operation.Operation|raw$, fldPath *$.field.Path|raw$, obj, oldObj *$.elemType|raw$) $.field.ErrorList|raw$ {\n", targs)
+			sw.Do("            return $.funcName|raw$(ctx, op, fldPath, obj, oldObj", generator.Args{"funcName": c.Universe.Type(ev.Function)})
+			for _, arg := range ev.Args {
+				sw.Do(", ", nil)
+				toGolangSourceDataLiteral(sw, c, arg)
+			}
+			sw.Do(")\n", nil)
+			sw.Do("        }", nil)
+		} else {
+			// Multiple validations - inline function
+			sw.Do("func(ctx $.context.Context|raw$, op $.operation.Operation|raw$, fldPath *$.field.Path|raw$, obj, oldObj *$.elemType|raw$) $.field.ErrorList|raw$ {\n", targs)
+			sw.Do("            var errs $.field.ErrorList|raw$\n", targs)
+
+			// Create a temporary snippet writer to capture the nested validations
+			buf := bytes.NewBuffer(nil)
+			nestedSW := sw.Dup(buf)
+
+			// Emit all element validations
+			emitCallsToValidators(c, spec.ElementValidations, nestedSW)
+
+			// Write the captured content
+			if err := sw.Merge(buf, nestedSW); err != nil {
+				panic(fmt.Sprintf("failed to merge buffer: %v", err))
+			}
+
+			sw.Do("            return errs\n", nil)
+			sw.Do("        }", nil)
+		}
+
+		sw.Do(")...)\n", nil)
+	}
+
+	sw.Do("        return errs\n", nil)
+	sw.Do("    })...)\n", nil)
 }
 
 func emitComments(comments []string, sw *generator.SnippetWriter) {
@@ -1427,6 +1542,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			sw.Do(")", nil)
 		}
 		sw.Do(" { $.$ }", v.Body)
+	case validators.MapSliceValidationSpec:
+		// This should never be reached if emitCallsToValidators is working correctly
+		panic("MapSliceValidationSpec should be handled by emitInlineSliceValidator")
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {
