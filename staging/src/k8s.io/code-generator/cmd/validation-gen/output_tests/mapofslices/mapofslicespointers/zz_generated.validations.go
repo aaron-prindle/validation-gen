@@ -22,7 +22,6 @@ limitations under the License.
 package mapofslicespointers
 
 import (
-	SPECIAL "SPECIAL"
 	context "context"
 
 	equality "k8s.io/apimachinery/pkg/api/equality"
@@ -110,9 +109,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 						oldSlice = *oldObj
 					}
 					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleStruct) field.ErrorList {
-						return SPECIAL.mapSliceElements(ctx, op, fldPath, obj, oldObj, Validate_SimpleStruct, []SimpleStruct, SimpleStruct)
-					})...)
+					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, Validate_SimpleStruct)...)
 					return errs
 				})...)
 			return
@@ -136,9 +133,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 						oldSlice = *oldObj
 					}
 					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComplexStruct) field.ErrorList {
-						return SPECIAL.mapSliceElements(ctx, op, fldPath, obj, oldObj, Validate_ComplexStruct, []ComplexStruct, ComplexStruct)
-					})...)
+					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, Validate_ComplexStruct)...)
 					return errs
 				})...)
 			return

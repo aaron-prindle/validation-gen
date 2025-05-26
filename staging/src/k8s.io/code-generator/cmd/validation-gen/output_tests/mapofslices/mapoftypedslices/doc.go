@@ -32,5 +32,6 @@ type TestStruct struct {
 	TypeMeta int
 
 	// +k8s:validateFalse="field TestStruct.TypedExtra"
+	// +k8s:optional
 	TypedExtra map[string]ValueList `json:"typedExtra"`
 }

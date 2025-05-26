@@ -61,6 +61,7 @@ type TestStruct struct {
 	// Key validation with typedef values
 	// +k8s:eachKey=+k8s:validateFalse="key TypedefKeys"
 	// +k8s:validateFalse="field TestStruct.TypedefKeys"
+	// +k8s:optional
 	TypedefKeys map[string]ValueList `json:"typedefKeys"`
 
 	// No validation - control case

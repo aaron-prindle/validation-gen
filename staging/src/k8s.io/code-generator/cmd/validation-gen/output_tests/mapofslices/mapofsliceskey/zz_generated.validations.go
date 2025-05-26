@@ -22,7 +22,6 @@ limitations under the License.
 package mapofsliceskey
 
 import (
-	SPECIAL "SPECIAL"
 	context "context"
 
 	equality "k8s.io/apimachinery/pkg/api/equality"
@@ -132,6 +131,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element KeysAndElements")
 					})...)
 					return errs
@@ -161,6 +163,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element IntSliceKeys")
 					})...)
 					return errs
@@ -208,6 +213,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element StructSliceKeys")
 					})...)
 					return errs
@@ -224,9 +232,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 						oldSlice = *oldObj
 					}
 					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
-						return SPECIAL.mapSliceElements(ctx, op, fldPath, obj, oldObj, Validate_User, []User, User)
-					})...)
+					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, Validate_User)...)
 					return errs
 				})...)
 			return
@@ -237,6 +243,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 		func(fldPath *field.Path, obj, oldObj map[string]ValueList) (errs field.ErrorList) {
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
+			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
 			}
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key TypedefKeys")

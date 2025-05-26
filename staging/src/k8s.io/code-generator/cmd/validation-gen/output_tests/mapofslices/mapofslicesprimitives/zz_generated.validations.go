@@ -65,6 +65,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.MaxLength(ctx, op, fldPath, obj, oldObj, 10)
 					})...)
 					return errs
@@ -91,6 +94,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
 					})...)
 					return errs
@@ -122,6 +128,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					}
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *uint) field.ErrorList {
+						if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+							return nil // no changes
+						}
 						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
 					})...)
 					return errs

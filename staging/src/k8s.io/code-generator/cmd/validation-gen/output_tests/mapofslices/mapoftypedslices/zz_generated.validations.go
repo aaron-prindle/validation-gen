@@ -58,6 +58,9 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field TestStruct.TypedExtra")...)
 			return
 		}(fldPath.Child("typedExtra"), obj.TypedExtra, safe.Field(oldObj, func(oldObj *TestStruct) map[string]ValueList { return oldObj.TypedExtra }))...)
