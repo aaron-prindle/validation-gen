@@ -672,22 +672,55 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the field is marked as opaque, we can treat it as it is
 				// were in a non-included package.
 			} else {
-				// If the map's key type is a named type, call the validation
-				// function for each key.
-				if funcName := keyNode.funcName; funcName.Name != "" {
-					// Save the iteration validation while we have all the
-					// information we need. Later we can check if we
-					// actually need it.
-					//
-					// Note: the first argument to Function() is really
-					// only for debugging.
-					v, err := validators.ForEachKey(childPath, childType,
-						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
-					if err != nil {
-						return fmt.Errorf("generating map key iteration: %w", err)
-					} else {
-						child.fieldKeyIterations.Add(v)
+				// Special handling for maps of slices
+				if child.node.elem.childType.Kind == types.Slice {
+					sliceElemNode := child.node.elem.node.elem
+					if sliceElemNode != nil && sliceElemNode.node != nil {
+						// Check if the slice element type has a validation function
+						if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
+							// Create a wrapped validation function
+							wrapperFunc := validators.FunctionGen{
+								TagName:  "mapSliceElementWrapper",
+								Flags:    validators.DefaultFlags,
+								Function: types.Name{Package: libValidationPkg, Name: "EachSliceVal"},
+								Args: []any{
+									validators.Literal("nil"),       // comparison function
+									validators.Identifier(funcName), // element validator
+								},
+							}
+
+							// Use ForEachVal with the wrapper
+							v, err := validators.ForEachVal(childPath, childType,
+								validators.WrapperFunction{
+									Function: wrapperFunc,
+									ObjType:  child.node.elem.childType,
+								})
+							if err != nil {
+								return fmt.Errorf("generating map slice element iteration: %w", err)
+							} else {
+								child.fieldValIterations.Add(v)
+							}
+						}
 					}
+				} else {
+					// If the map's key type is a named type, call the validation
+					// function for each key.
+					if funcName := keyNode.funcName; funcName.Name != "" {
+						// Save the iteration validation while we have all the
+						// information we need. Later we can check if we
+						// actually need it.
+						//
+						// Note: the first argument to Function() is really
+						// only for debugging.
+						v, err := validators.ForEachKey(childPath, childType,
+							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+						if err != nil {
+							return fmt.Errorf("generating map key iteration: %w", err)
+						} else {
+							child.fieldKeyIterations.Add(v)
+						}
+					}
+
 				}
 			}
 			// Validate each value of a map field.
@@ -1545,6 +1578,8 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	case validators.MapSliceValidationSpec:
 		// This should never be reached if emitCallsToValidators is working correctly
 		panic("MapSliceValidationSpec should be handled by emitInlineSliceValidator")
+	case types.Name:
+		sw.Do("$.|raw$", c.Universe.Type(v))
 	default:
 		rv := reflect.ValueOf(value)
 		switch rv.Kind() {

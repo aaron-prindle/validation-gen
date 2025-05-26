@@ -22,6 +22,7 @@ limitations under the License.
 package mapofsliceskey
 
 import (
+	SPECIAL "SPECIAL"
 	context "context"
 
 	equality "k8s.io/apimachinery/pkg/api/equality"
@@ -208,6 +209,23 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					// Element validations
 					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
 						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element StructSliceKeys")
+					})...)
+					return errs
+				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]User) field.ErrorList {
+					var errs field.ErrorList
+					if obj == nil {
+						return nil
+					}
+					slice := *obj
+					var oldSlice []User
+					if oldObj != nil {
+						oldSlice = *oldObj
+					}
+					// Element validations
+					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
+						return SPECIAL.mapSliceElements(ctx, op, fldPath, obj, oldObj, Validate_User, []User, User)
 					})...)
 					return errs
 				})...)
