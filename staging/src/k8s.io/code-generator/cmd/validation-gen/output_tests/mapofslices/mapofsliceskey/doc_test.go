@@ -50,19 +50,18 @@ func TestMapOfSlicesKey(t *testing.T) {
 		)
 	})
 
-	t.Run("combined key and slice validation", func(t *testing.T) {
+	t.Run("combined key and slice size validation", func(t *testing.T) {
 		obj := &TestStruct{
 			KeysAndSlices: map[string][]string{
 				"key1": {"one", "two", "three"},
-				"key2": {"four"},
+				"key2": {"one", "two", "three", "four"}, // exceeds maxItems
 			},
 		}
 		localSchemeBuilder.Test(t).Value(obj).ExpectInvalid(
 			field.Invalid(nil, obj, "forced failure: type TestStruct"),
 			field.Invalid(field.NewPath("keysAndSlices"), "key1", "forced failure: key KeysAndSlices"),
 			field.Invalid(field.NewPath("keysAndSlices"), "key2", "forced failure: key KeysAndSlices"),
-			field.Invalid(field.NewPath("keysAndSlices").Key("key1"), []string{"one", "two", "three"}, "forced failure: slice KeysAndSlices"),
-			field.Invalid(field.NewPath("keysAndSlices").Key("key2"), []string{"four"}, "forced failure: slice KeysAndSlices"),
+			field.TooMany(field.NewPath("keysAndSlices").Key("key2"), 4, 3),
 		)
 	})
 
@@ -113,8 +112,6 @@ func TestMapOfSlicesKey(t *testing.T) {
 			field.Invalid(nil, obj, "forced failure: type TestStruct"),
 			field.Invalid(field.NewPath("structSliceKeys"), "admins", "forced failure: key StructSliceKeys"),
 			field.Invalid(field.NewPath("structSliceKeys"), "users", "forced failure: key StructSliceKeys"),
-			field.Invalid(field.NewPath("structSliceKeys").Key("admins"), []User{{Name: "root", ID: 0}}, "forced failure: slice StructSliceKeys"),
-			field.Invalid(field.NewPath("structSliceKeys").Key("users"), []User{{Name: "alice", ID: 1}, {Name: "bob", ID: 2}}, "forced failure: slice StructSliceKeys"),
 			field.Invalid(field.NewPath("structSliceKeys").Key("admins").Index(0), User{Name: "root", ID: 0}, "forced failure: element StructSliceKeys"),
 			field.Invalid(field.NewPath("structSliceKeys").Key("users").Index(0), User{Name: "alice", ID: 1}, "forced failure: element StructSliceKeys"),
 			field.Invalid(field.NewPath("structSliceKeys").Key("users").Index(1), User{Name: "bob", ID: 2}, "forced failure: element StructSliceKeys"),
@@ -122,6 +119,40 @@ func TestMapOfSlicesKey(t *testing.T) {
 			field.Invalid(nil, User{Name: "alice", ID: 1}, "forced failure: type User"),
 			field.Invalid(nil, User{Name: "bob", ID: 2}, "forced failure: type User"),
 		)
+	})
+
+	t.Run("struct slices exceeding max items", func(t *testing.T) {
+		obj := &TestStruct{
+			StructSliceKeys: map[string][]User{
+				"toomany": make([]User, 6), // exceeds maxItems of 5
+			},
+		}
+		// Initialize the slice with valid data
+		for i := 0; i < 6; i++ {
+			obj.StructSliceKeys["toomany"][i] = User{Name: "user", ID: i}
+		}
+
+		// Build expected errors
+		expectedErrors := []any{
+			field.Invalid(nil, obj, "forced failure: type TestStruct"),
+			field.Invalid(field.NewPath("structSliceKeys"), "toomany", "forced failure: key StructSliceKeys"),
+			field.TooMany(field.NewPath("structSliceKeys").Key("toomany"), 6, 5),
+		}
+		// Add element validation errors for each user
+		for i := 0; i < 6; i++ {
+			expectedErrors = append(expectedErrors,
+				field.Invalid(field.NewPath("structSliceKeys").Key("toomany").Index(i),
+					obj.StructSliceKeys["toomany"][i], "forced failure: element StructSliceKeys"),
+			)
+		}
+		// Add type validation errors for each user
+		for i := 0; i < 6; i++ {
+			expectedErrors = append(expectedErrors,
+				field.Invalid(nil, obj.StructSliceKeys["toomany"][i], "forced failure: type User"),
+			)
+		}
+
+		localSchemeBuilder.Test(t).Value(obj).ExpectInvalid(expectedErrors...)
 	})
 
 	t.Run("typedef values with key validation", func(t *testing.T) {
@@ -196,6 +227,29 @@ func TestMapOfSlicesKey(t *testing.T) {
 			field.Invalid(nil, newObj, "forced failure: type TestStruct"),
 			field.Invalid(field.NewPath("basicKeys"), "new", "forced failure: key BasicKeys"),
 			field.Invalid(field.NewPath("basicKeys"), "old", "forced failure: key BasicKeys"),
+		)
+	})
+
+	t.Run("all validations together", func(t *testing.T) {
+		obj := &TestStruct{
+			BasicKeys: map[string][]string{
+				"key": {"val"},
+			},
+			KeysAndSlices: map[string][]string{
+				"short": {"one", "two"}, // within maxItems limit
+			},
+			IntSliceKeys: map[string][]int{
+				"nums": {1, 2},
+			},
+		}
+		localSchemeBuilder.Test(t).Value(obj).ExpectInvalid(
+			field.Invalid(nil, obj, "forced failure: type TestStruct"),
+			field.Invalid(field.NewPath("basicKeys"), "key", "forced failure: key BasicKeys"),
+			field.Invalid(field.NewPath("keysAndSlices"), "short", "forced failure: key KeysAndSlices"),
+			field.Invalid(field.NewPath("intSliceKeys"), "nums", "forced failure: key IntSliceKeys"),
+			field.Invalid(field.NewPath("intSliceKeys").Key("nums").Index(0), 1, "forced failure: element IntSliceKeys"),
+			field.Invalid(field.NewPath("intSliceKeys").Key("nums").Index(1), 2, "forced failure: element IntSliceKeys"),
+			field.Invalid(field.NewPath("typedefKeys"), obj.TypedefKeys, "forced failure: field TestStruct.TypedefKeys"),
 		)
 	})
 }

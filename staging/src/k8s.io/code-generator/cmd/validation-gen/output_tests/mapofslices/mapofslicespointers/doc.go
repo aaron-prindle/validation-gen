@@ -53,6 +53,7 @@ type ComplexStruct struct {
 	OptionalInt  *int    `json:"optionalInt,omitempty"`
 
 	// Nested struct pointer
+	// +k8s:optional
 	Nested *SimpleStruct `json:"nested,omitempty"`
 
 	// Regular fields

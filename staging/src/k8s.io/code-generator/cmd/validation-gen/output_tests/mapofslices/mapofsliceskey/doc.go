@@ -37,9 +37,9 @@ type TestStruct struct {
 	// +k8s:eachKey=+k8s:validateFalse="key MultipleKeys #2"
 	MultipleKeys map[string][]string `json:"multipleKeys"`
 
-	// Key validation combined with value validation
+	// Key validation combined with slice size validation
 	// +k8s:eachKey=+k8s:validateFalse="key KeysAndSlices"
-	// +k8s:eachVal=+k8s:validateFalse="slice KeysAndSlices"
+	// +k8s:eachVal=+k8s:maxItems=3
 	KeysAndSlices map[string][]string `json:"keysAndSlices"`
 
 	// Key validation with nested value validation
@@ -54,7 +54,7 @@ type TestStruct struct {
 
 	// Key validation on map of struct slices
 	// +k8s:eachKey=+k8s:validateFalse="key StructSliceKeys"
-	// +k8s:eachVal=+k8s:validateFalse="slice StructSliceKeys"
+	// +k8s:eachVal=+k8s:maxItems=5
 	// +k8s:eachVal=+k8s:eachVal=+k8s:validateFalse="element StructSliceKeys"
 	StructSliceKeys map[string][]User `json:"structSliceKeys"`
 

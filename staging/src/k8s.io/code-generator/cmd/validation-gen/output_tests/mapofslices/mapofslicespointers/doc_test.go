@@ -48,7 +48,7 @@ func TestMapOfSlicesPointers(t *testing.T) {
 				field.NewPath("structSlices").Key("invalid").Index(0).Child("name"),
 				"this-name-is-way-too-long",
 				"must be no more than 20 bytes",
-			),
+			).WithOrigin("maxLength"),
 		)
 	})
 
@@ -63,7 +63,7 @@ func TestMapOfSlicesPointers(t *testing.T) {
 				field.NewPath("structSlices").Key("invalid").Index(0).Child("value"),
 				-5,
 				"must be greater than or equal to 0",
-			),
+			).WithOrigin("minimum"),
 		)
 	})
 
@@ -166,7 +166,7 @@ func TestMapOfSlicesPointers(t *testing.T) {
 				field.NewPath("complexStructSlices").Key("nested").Index(0).Child("nested").Child("name"),
 				"this-nested-name-is-too-long",
 				"must be no more than 20 bytes",
-			),
+			).WithOrigin("maxLength"),
 		)
 	})
 
@@ -179,30 +179,27 @@ func TestMapOfSlicesPointers(t *testing.T) {
 				},
 			},
 		}
-		localSchemeBuilder.Test(t).Value(obj).ExpectMatches(
-			field.ErrorMatcher{},
-			field.ErrorList{
-				field.Invalid(
-					field.NewPath("structSlices").Key("errors").Index(0).Child("name"),
-					"name-that-is-definitely-too-long",
-					"must be no more than 20 bytes",
-				),
-				field.Invalid(
-					field.NewPath("structSlices").Key("errors").Index(0).Child("value"),
-					-10,
-					"must be greater than or equal to 0",
-				),
-				field.Invalid(
-					field.NewPath("structSlices").Key("errors").Index(1).Child("name"),
-					"another-name-that-is-too-long",
-					"must be no more than 20 bytes",
-				),
-				field.Invalid(
-					field.NewPath("structSlices").Key("errors").Index(1).Child("value"),
-					-5,
-					"must be greater than or equal to 0",
-				),
-			},
+		localSchemeBuilder.Test(t).Value(obj).ExpectInvalid(
+			field.Invalid(
+				field.NewPath("structSlices").Key("errors").Index(0).Child("name"),
+				"name-that-is-definitely-too-long",
+				"must be no more than 20 bytes",
+			).WithOrigin("maxLength"),
+			field.Invalid(
+				field.NewPath("structSlices").Key("errors").Index(0).Child("value"),
+				-10,
+				"must be greater than or equal to 0",
+			).WithOrigin("minimum"),
+			field.Invalid(
+				field.NewPath("structSlices").Key("errors").Index(1).Child("name"),
+				"another-name-that-is-too-long",
+				"must be no more than 20 bytes",
+			).WithOrigin("maxLength"),
+			field.Invalid(
+				field.NewPath("structSlices").Key("errors").Index(1).Child("value"),
+				-5,
+				"must be greater than or equal to 0",
+			).WithOrigin("minimum"),
 		)
 	})
 }
