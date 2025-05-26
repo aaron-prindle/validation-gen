@@ -678,28 +678,20 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 					if sliceElemNode != nil && sliceElemNode.node != nil {
 						// Check if the slice element type has a validation function
 						if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
-							// Create a wrapped validation function
-							wrapperFunc := validators.FunctionGen{
-								TagName:  "mapSliceElementWrapper",
-								Flags:    validators.DefaultFlags,
-								Function: types.Name{Package: libValidationPkg, Name: "EachSliceVal"},
-								Args: []any{
-									validators.Literal("nil"),       // comparison function
-									validators.Identifier(funcName), // element validator
-								},
+							// Create a wrapper validation that will handle the map->slice->element chain
+							spec := validators.MapSliceValidationSpec{
+								ElementValidations: []validators.FunctionGen{{
+									TagName:  "mapSliceElement",
+									Flags:    validators.DefaultFlags,
+									Function: funcName,
+								}},
+								ElementType: sliceElemNode.childType,
+								SliceType:   child.node.elem.childType,
 							}
 
-							// Use ForEachVal with the wrapper
-							v, err := validators.ForEachVal(childPath, childType,
-								validators.WrapperFunction{
-									Function: wrapperFunc,
-									ObjType:  child.node.elem.childType,
-								})
-							if err != nil {
-								return fmt.Errorf("generating map slice element iteration: %w", err)
-							} else {
-								child.fieldValIterations.Add(v)
-							}
+							fn := validators.Function("mapSliceValidation", validators.DefaultFlags,
+								validateEachMapVal, spec)
+							child.fieldValIterations.Add(validators.Validations{Functions: []validators.FunctionGen{fn}})
 						}
 					}
 				} else {
