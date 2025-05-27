@@ -144,3 +144,10 @@ func SemanticDeepEqual[T any](a, b T) bool {
 func DirectEqual[T comparable](a, b T) bool {
 	return a == b
 }
+
+// EachMapSliceValWithFunc is a helper that validates each element of each slice value in a map
+// using the provided validation function. This is used internally by generated code.
+func EachMapSliceValWithFunc[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path,
+	newMap, oldMap map[K][]V, sliceValidator ValidateFunc[*[]V]) field.ErrorList {
+	return EachMapVal(ctx, op, fldPath, newMap, oldMap, sliceValidator)
+}
