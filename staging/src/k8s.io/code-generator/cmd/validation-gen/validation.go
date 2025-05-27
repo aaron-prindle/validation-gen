@@ -675,47 +675,22 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the field is marked as opaque, we can treat it as it is
 				// were in a non-included package.
 			} else {
-				// Special handling for maps of slices
-				if child.node.elem.childType.Kind == types.Slice {
-					sliceElemNode := child.node.elem.node.elem
-					if sliceElemNode != nil && sliceElemNode.node != nil {
-						// Check if the slice element type has a validation function
-						if funcName := sliceElemNode.node.funcName; funcName.Name != "" {
-							// Create a wrapper validation that will handle the map->slice->element chain
-							spec := validators.MapSliceValidationSpec{
-								ElementValidations: []validators.FunctionGen{{
-									TagName:  "mapSliceElement",
-									Flags:    validators.DefaultFlags,
-									Function: funcName,
-								}},
-								ElementType: sliceElemNode.childType,
-								SliceType:   child.node.elem.childType,
-							}
-
-							fn := validators.Function("mapSliceValidation", validators.DefaultFlags,
-								validateEachMapVal, spec)
-							child.fieldValIterations.Add(validators.Validations{Functions: []validators.FunctionGen{fn}})
-						}
+				// If the map's key type is a named type, call the validation
+				// function for each key.
+				if funcName := keyNode.funcName; funcName.Name != "" {
+					// Save the iteration validation while we have all the
+					// information we need. Later we can check if we
+					// actually need it.
+					//
+					// Note: the first argument to Function() is really
+					// only for debugging.
+					v, err := validators.ForEachKey(childPath, childType,
+						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+					if err != nil {
+						return fmt.Errorf("generating map key iteration: %w", err)
+					} else {
+						child.fieldKeyIterations.Add(v)
 					}
-				} else {
-					// If the map's key type is a named type, call the validation
-					// function for each key.
-					if funcName := keyNode.funcName; funcName.Name != "" {
-						// Save the iteration validation while we have all the
-						// information we need. Later we can check if we
-						// actually need it.
-						//
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachKey(childPath, childType,
-							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
-						if err != nil {
-							return fmt.Errorf("generating map key iteration: %w", err)
-						} else {
-							child.fieldKeyIterations.Add(v)
-						}
-					}
-
 				}
 			}
 			// Validate each value of a map field.
@@ -740,28 +715,35 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the field is marked as opaque, we can treat it as it is
 				// were in a non-included package.
 			} else {
-				// If the map's value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// Check if this is a typedef to a slice
-					isSliceTypedef := elemNode.valueType.Kind == types.Alias &&
-						elemNode.valueType.Underlying.Kind == types.Slice
+				// Check if this is a map of slices
+				isMapOfSlices := child.node.elem.childType.Kind == types.Slice
 
-					// Check if this is a direct map of slices (not typedef)
-					isDirectSlice := child.node.elem.childType.Kind == types.Slice
+				if isMapOfSlices {
+					// For maps of slices, we don't generate ForEachVal here
+					// The validation will be handled by the eachVal validator
+					// which will generate the proper nested validation calls
+					klog.V(5).InfoS("skipping ForEachVal for map of slices, will be handled by eachVal", "field", childPath)
+				} else {
+					// For regular maps (not maps of slices), generate validation as before
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// Check if this is a typedef to a slice
+						isSliceTypedef := elemNode.valueType.Kind == types.Alias &&
+							elemNode.valueType.Underlying.Kind == types.Slice
 
-					if !isSliceTypedef && !isDirectSlice {
-						// Only generate ForEachVal for non-slice map values
-						v, err := validators.ForEachVal(childPath, childType,
-							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
-						if err != nil {
-							return fmt.Errorf("generating map value iteration: %w", err)
-						} else {
-							child.fieldValIterations.Add(v)
+						if !isSliceTypedef {
+							// Only generate ForEachVal for non-slice typedefs
+							// Slice typedefs have signature mismatches with EachMapVal
+							v, err := validators.ForEachVal(childPath, childType,
+								validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+							if err != nil {
+								return fmt.Errorf("generating map value iteration: %w", err)
+							} else {
+								child.fieldValIterations.Add(v)
+							}
 						}
+						// For slice typedefs, we skip calling their validation function
+						// The validations will still be applied if there are field-level validations
 					}
-					// For slice typedefs and direct slices, we skip calling their validation function
-					// The validations will still be applied if there are field-level validations
 				}
 			}
 		}

@@ -220,21 +220,6 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 					})...)
 					return errs
 				})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]User) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []User
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, Validate_User)...)
-					return errs
-				})...)
 			return
 		}(fldPath.Child("structSliceKeys"), obj.StructSliceKeys, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]User { return oldObj.StructSliceKeys }))...)
 
