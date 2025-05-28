@@ -52,23 +52,11 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]string) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []string
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-						return validate.MaxLength(ctx, op, fldPath, obj, oldObj, 10)
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.MaxLength(ctx, op, fldPath, obj, oldObj, 10)
+				})
+			})...)
 			return
 		}(fldPath.Child("stringSlices"), obj.StringSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]string { return oldObj.StringSlices }))...)
 
@@ -78,23 +66,11 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]int) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []int
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []int) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
+				})
+			})...)
 			return
 		}(fldPath.Child("intSlices"), obj.IntSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]int { return oldObj.IntSlices }))...)
 
@@ -109,23 +85,11 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]uint) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []uint
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *uint) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []uint) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *uint) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
+				})
+			})...)
 			return
 		}(fldPath.Child("uintSlices"), obj.UintSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]uint { return oldObj.UintSlices }))...)
 

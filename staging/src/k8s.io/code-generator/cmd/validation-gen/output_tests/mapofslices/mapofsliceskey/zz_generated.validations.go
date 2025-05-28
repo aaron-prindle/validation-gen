@@ -85,27 +85,15 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+				return validate.MaxItems(ctx, op, fldPath, obj, oldObj, 3)
+			}); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key KeysAndSlices")
 			})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]string) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []string
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Slice-level validations
-					if e := validate.MaxItems(ctx, op, fldPath, slice, oldSlice, 3); len(e) != 0 {
-						errs = append(errs, e...)
-						return errs // do not proceed
-					}
-					return errs
-				})...)
 			return
 		}(fldPath.Child("keysAndSlices"), obj.KeysAndSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]string { return oldObj.KeysAndSlices }))...)
 
@@ -118,23 +106,11 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key KeysAndElements")
 			})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]string) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []string
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element KeysAndElements")
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element KeysAndElements")
+				})
+			})...)
 			return
 		}(fldPath.Child("keysAndElements"), obj.KeysAndElements, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]string { return oldObj.KeysAndElements }))...)
 
@@ -147,23 +123,11 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key IntSliceKeys")
 			})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]int) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []int
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element IntSliceKeys")
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []int) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element IntSliceKeys")
+				})
+			})...)
 			return
 		}(fldPath.Child("intSliceKeys"), obj.IntSliceKeys, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]int { return oldObj.IntSliceKeys }))...)
 
@@ -173,61 +137,20 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []User) field.ErrorList {
+				return validate.MaxItems(ctx, op, fldPath, obj, oldObj, 5)
+			}); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
 			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key StructSliceKeys")
 			})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]User) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []User
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Slice-level validations
-					if e := validate.MaxItems(ctx, op, fldPath, slice, oldSlice, 5); len(e) != 0 {
-						errs = append(errs, e...)
-						return errs // do not proceed
-					}
-					return errs
-				})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]User) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []User
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
-						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element StructSliceKeys")
-					})...)
-					return errs
-				})...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]User) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []User
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
-						return Validate_User(ctx, op, fldPath, obj, oldObj)
-					})...)
-					return errs
-				})...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []User) field.ErrorList {
+				return validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *User) field.ErrorList {
+					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "element StructSliceKeys")
+				})
+			})...)
 			return
 		}(fldPath.Child("structSliceKeys"), obj.StructSliceKeys, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]User { return oldObj.StructSliceKeys }))...)
 
@@ -241,6 +164,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "key TypedefKeys")
 			})...)
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field TestStruct.TypedefKeys")...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, Validate_ValueList)...)
 			return
 		}(fldPath.Child("typedefKeys"), obj.TypedefKeys, safe.Field(oldObj, func(oldObj *TestStruct) map[string]ValueList { return oldObj.TypedefKeys }))...)
 

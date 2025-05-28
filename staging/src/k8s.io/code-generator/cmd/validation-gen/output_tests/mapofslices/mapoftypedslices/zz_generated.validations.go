@@ -59,6 +59,7 @@ func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *f
 				return nil // no changes
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field TestStruct.TypedExtra")...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, Validate_ValueList)...)
 			return
 		}(fldPath.Child("typedExtra"), obj.TypedExtra, safe.Field(oldObj, func(oldObj *TestStruct) map[string]ValueList { return oldObj.TypedExtra }))...)
 

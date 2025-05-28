@@ -24,7 +24,6 @@ package mapofslicespointers
 import (
 	context "context"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -90,59 +89,8 @@ func Validate_SimpleStruct(ctx context.Context, op operation.Operation, fldPath 
 
 func Validate_TestStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TestStruct) (errs field.ErrorList) {
 	// field TestStruct.TypeMeta has no validation
-
-	// field TestStruct.StructSlices
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string][]SimpleStruct) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]SimpleStruct) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []SimpleStruct
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SimpleStruct) field.ErrorList {
-						return Validate_SimpleStruct(ctx, op, fldPath, obj, oldObj)
-					})...)
-					return errs
-				})...)
-			return
-		}(fldPath.Child("structSlices"), obj.StructSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]SimpleStruct { return oldObj.StructSlices }))...)
-
-	// field TestStruct.ComplexStructSlices
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string][]ComplexStruct) (errs field.ErrorList) {
-			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
-			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *[]ComplexStruct) field.ErrorList {
-					var errs field.ErrorList
-					if obj == nil {
-						return nil
-					}
-					slice := *obj
-					var oldSlice []ComplexStruct
-					if oldObj != nil {
-						oldSlice = *oldObj
-					}
-					// Element validations
-					errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, slice, oldSlice, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComplexStruct) field.ErrorList {
-						return Validate_ComplexStruct(ctx, op, fldPath, obj, oldObj)
-					})...)
-					return errs
-				})...)
-			return
-		}(fldPath.Child("complexStructSlices"), obj.ComplexStructSlices, safe.Field(oldObj, func(oldObj *TestStruct) map[string][]ComplexStruct { return oldObj.ComplexStructSlices }))...)
-
+	// field TestStruct.StructSlices has no validation
+	// field TestStruct.ComplexStructSlices has no validation
 	// field TestStruct.StringSlices has no validation
 	return errs
 }
