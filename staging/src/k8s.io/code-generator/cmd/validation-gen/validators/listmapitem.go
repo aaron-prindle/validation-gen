@@ -121,10 +121,6 @@ func (stv *listMapItemTagValidator) GetValidations(context Context, args []strin
 	// Create synthetic member for the matched item
 	fakeMember := synthesizeListItemMember(elemT, parsedArg.MatcherPairs)
 
-	// Add the chained validation tags as comments
-	// fakeMember.CommentLines = []string{fakeComments}
-	fakeMember.CommentLines = []string{}
-
 	subContext := Context{
 		Member: fakeMember,
 		Scope:  ScopeField,
@@ -133,15 +129,6 @@ func (stv *listMapItemTagValidator) GetValidations(context Context, args []strin
 		Parent: nil,
 		Path:   context.Path.Key(subContextPath),
 	}
-	// subContext := Context{
-	// 	Scope: ScopeField,
-	// 	Type:  elemT,
-	// 	// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
-	// 	Parent: nil,
-	// 	Path:   context.Path.Key(subContextPath),
-	// 	// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
-	// 	Member: nil,
-	// }
 
 	if validations, err := stv.validator.ExtractValidations(subContext, fakeComments); err != nil {
 		return Validations{}, err
