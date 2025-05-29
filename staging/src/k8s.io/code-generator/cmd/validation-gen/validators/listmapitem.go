@@ -117,15 +117,31 @@ func (stv *listMapItemTagValidator) GetValidations(context Context, args []strin
 
 	// Generates context path like Struct.Conditions[status="true",type="Approved"].
 	subContextPath := generatePathForMap(parsedArg.MatcherPairs)
+
+	// Create synthetic member for the matched item
+	fakeMember := synthesizeListItemMember(elemT, parsedArg.MatcherPairs)
+
+	// Add the chained validation tags as comments
+	// fakeMember.CommentLines = []string{fakeComments}
+	fakeMember.CommentLines = []string{}
+
 	subContext := Context{
-		Scope: ScopeField,
-		Type:  elemT,
+		Member: fakeMember,
+		Scope:  ScopeField,
+		Type:   elemT,
 		// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
 		Parent: nil,
 		Path:   context.Path.Key(subContextPath),
-		// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
-		Member: nil,
 	}
+	// subContext := Context{
+	// 	Scope: ScopeField,
+	// 	Type:  elemT,
+	// 	// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
+	// 	Parent: nil,
+	// 	Path:   context.Path.Key(subContextPath),
+	// 	// TODO(aaron-prindle) for +k8s:unionMember support need to plumb this.
+	// 	Member: nil,
+	// }
 
 	if validations, err := stv.validator.ExtractValidations(subContext, fakeComments); err != nil {
 		return Validations{}, err
@@ -215,6 +231,26 @@ func generatePathForMap(matcherPairs [][2]string) string {
 		sb.WriteString(fmt.Sprintf("%s=%q", pair[0], pair[1]))
 	}
 	return sb.String()
+}
+
+func synthesizeListItemMember(itemType *types.Type, matcherPairs [][2]string) *types.Member {
+	// Create a descriptive name for the virtual member
+	var keyParts []string
+	for _, pair := range matcherPairs {
+		keyParts = append(keyParts, fmt.Sprintf("%s=%s", pair[0], pair[1]))
+	}
+	memberName := fmt.Sprintf("_listItem[%s]", strings.Join(keyParts, ","))
+
+	// Create a fake member that represents the matched list item
+	fakeMember := &types.Member{
+		Name:         memberName,
+		Type:         itemType,
+		Embedded:     false,
+		CommentLines: []string{}, // Will be populated with chained tags
+		Tags:         "",         // No struct tags for virtual members
+	}
+
+	return fakeMember
 }
 
 func (stv listMapItemTagValidator) Docs() TagDoc {
