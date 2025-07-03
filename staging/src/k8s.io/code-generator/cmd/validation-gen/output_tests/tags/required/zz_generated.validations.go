@@ -107,9 +107,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringField")...)
 			return
@@ -121,9 +127,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringPtrField")...)
 			return
@@ -135,9 +147,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefField")...)
 			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
@@ -150,9 +168,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefPtrField")...)
 			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
@@ -165,9 +189,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntField")...)
 			return
@@ -179,9 +209,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntPtrField")...)
 			return
@@ -193,9 +229,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefField")...)
 			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
@@ -208,9 +250,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefPtrField")...)
 			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
@@ -223,9 +271,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.OtherStructPtrField")...)
 			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
@@ -238,9 +292,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceField")...)
 			return
@@ -252,9 +312,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceTypedefField")...)
 			errs = append(errs, Validate_SliceType(ctx, op, fldPath, obj, oldObj)...)
@@ -267,9 +333,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField")...)
 			return
@@ -281,9 +353,15 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypedefField")...)
 			errs = append(errs, Validate_MapType(ctx, op, fldPath, obj, oldObj)...)

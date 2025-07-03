@@ -1177,9 +1177,38 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 
 	validations = sort(validations)
 
+	// Handle short-circuit validations as a group.
+	doingShortCircuit := false
+	beforeShortCircuits := func() {
+		// The first short-circuit validation opens a scope.
+		sw.Do("{\n", nil)
+		sw.Do("  earlyReturn := false\n", nil)
+		doingShortCircuit = true
+	}
+	afterShortCircuits := func() { // idemptotent
+		// The last short-circuit validation closes the scope.
+		if doingShortCircuit {
+			sw.Do("  if earlyReturn {\n", nil)
+			sw.Do("    return // do not proceed\n", nil)
+			sw.Do("  }\n", nil)
+			sw.Do("}\n", nil)
+		}
+		doingShortCircuit = false
+	}
 	for _, v := range validations {
 		isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
 		isNonError := v.Flags.IsSet(validators.NonError)
+
+		if !doingShortCircuit && isShortCircuit {
+			// This is the first short-circuit.
+			beforeShortCircuits()
+			// In case we ONLY have short-circuits.
+			defer afterShortCircuits()
+		}
+		if doingShortCircuit && !isShortCircuit {
+			// We've passed the last short-circuit.
+			afterShortCircuits()
+		}
 
 		targs := generator.Args{
 			"funcName": c.Universe.Type(v.Function),
@@ -1244,7 +1273,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			if !isNonError {
 				sw.Do("errs = append(errs, e...)\n", nil)
 			}
-			sw.Do("    return // do not proceed\n", nil)
+			sw.Do("    earlyReturn = true\n", nil)
 			sw.Do("}\n", nil)
 		} else {
 			if isNonError {

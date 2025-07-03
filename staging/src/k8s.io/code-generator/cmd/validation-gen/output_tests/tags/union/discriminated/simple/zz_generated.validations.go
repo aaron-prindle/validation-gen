@@ -81,8 +81,14 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			return
 		}(fldPath.Child("m1"), obj.M1, safe.Field(oldObj, func(oldObj *Struct) *M1 { return oldObj.M1 }))...)
@@ -93,8 +99,14 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				return // do not proceed
+			{
+				earlyReturn := false
+				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			return
 		}(fldPath.Child("m2"), obj.M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.M2 }))...)

@@ -95,10 +95,16 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			// optional fields with default values are effectively required
-			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				return // do not proceed
+			{
+				earlyReturn := false
+				// optional fields with default values are effectively required
+				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
 			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return

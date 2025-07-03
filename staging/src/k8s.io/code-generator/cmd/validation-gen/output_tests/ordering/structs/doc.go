@@ -30,7 +30,7 @@ type Tother struct {
 	OS string `json:"os"`
 }
 
-// Treat these as 4 bits, and ensure all combinations
+// Treat these as 2 bits, and ensure all combinations
 //   bit 0: no flags
 //   bit 1: ShortCircuit
 
