@@ -164,7 +164,8 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 	updateCaps := ufv.calculateUpdateCapabilities(fieldInfo, fm.updateConstraints)
 
 	// Generate validations
-	return ufv.generateValidations(context, fm, fieldInfo, updateCaps)
+	return ufv.generateValidations(context, fieldInfo, updateCaps)
+	// return ufv.generateValidations(context, fm, fieldInfo, updateCaps)
 }
 
 // fieldInfo holds information about field tags
