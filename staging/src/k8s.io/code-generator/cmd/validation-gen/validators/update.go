@@ -165,7 +165,6 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 
 	// Generate validations
 	return ufv.generateValidations(context, fieldInfo, updateCaps)
-	// return ufv.generateValidations(context, fm, fieldInfo, updateCaps)
 }
 
 // fieldInfo holds information about field tags
@@ -283,15 +282,18 @@ func (ufv updateFieldValidator) generateValidations(
 ) (Validations, error) {
 	var result Validations
 
+	// IMPORTANT: Use ShortCircuit flag so these run in the same group as +k8s:optional
+	// This ensures that both validators get a chance to run before the early return decision
+
 	// Add basic validation functions
 	if !caps.canSet {
-		result.AddFunction(Function("update:NoSet", DefaultFlags, noSetValidator))
+		result.AddFunction(Function("update:NoSet", ShortCircuit, noSetValidator))
 	}
 	if !caps.canUnset {
-		result.AddFunction(Function("update:NoUnset", DefaultFlags, noUnsetValidator))
+		result.AddFunction(Function("update:NoUnset", ShortCircuit, noUnsetValidator))
 	}
 	if !caps.canModify {
-		result.AddFunction(Function("update:NoModify", DefaultFlags, noModifyValidator))
+		result.AddFunction(Function("update:NoModify", ShortCircuit, noModifyValidator))
 	}
 
 	// Handle compound types (lists and maps)
@@ -307,23 +309,25 @@ func (ufv updateFieldValidator) generateValidations(
 }
 
 func (ufv updateFieldValidator) addSliceValidations(result *Validations, caps updateCapabilities, hasRequired bool) {
+	// Also use ShortCircuit for list/map validations
 	if !caps.canAddItem {
-		result.AddFunction(Function("update:NoAddItem", DefaultFlags, noAddItemValidator))
+		result.AddFunction(Function("update:NoAddItem", ShortCircuit, noAddItemValidator))
 	}
 
 	if !caps.canRemoveItem {
-		result.AddFunction(Function("update:NoRemoveItem", DefaultFlags, noRemoveItemValidator))
+		result.AddFunction(Function("update:NoRemoveItem", ShortCircuit, noRemoveItemValidator))
 	} else if hasRequired {
 		// Special handling for required lists - cannot remove last item
-		result.AddFunction(Function("update:NoRemoveLastItem", DefaultFlags, noRemoveLastItemValidator))
+		result.AddFunction(Function("update:NoRemoveLastItem", ShortCircuit, noRemoveLastItemValidator))
 	}
 }
 
 func (ufv updateFieldValidator) addMapValidations(result *Validations, caps updateCapabilities) {
+	// Also use ShortCircuit for map validations
 	if !caps.canAddItem {
-		result.AddFunction(Function("update:NoAddItem", DefaultFlags, noAddItemMapValidator))
+		result.AddFunction(Function("update:NoAddItem", ShortCircuit, noAddItemMapValidator))
 	}
 	if !caps.canRemoveItem {
-		result.AddFunction(Function("update:NoRemoveItem", DefaultFlags, noRemoveItemMapValidator))
+		result.AddFunction(Function("update:NoRemoveItem", ShortCircuit, noRemoveItemMapValidator))
 	}
 }

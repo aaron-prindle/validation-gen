@@ -29,34 +29,40 @@ type UpdateTestStruct struct {
 
 	// Field that can be set once after creation (like PVC.volumeName)
 	// This is the "immutable once set" pattern from the design doc
+	// +k8s:optional
 	// +k8s:update=`NoModify,NoUnset`
 	SetOnceField string `json:"setOnceField"`
 
 	// Field that must be set at creation or remain unset forever
 	// If unset at creation, it can never be set
+	// +k8s:optional
 	// +k8s:update=`NoSet`
 	CreateOnlyField string `json:"createOnlyField"`
 
 	// Append-only list
+	// +k8s:optional
 	// +k8s:update=`NoRemoveItem,NoUnset`
 	AppendOnlyList []string `json:"appendOnlyList"`
 
 	// Immutable list (no adds or removes)
+	// +k8s:optional
 	// +k8s:update=`NoAddItem,NoRemoveItem`
 	ImmutableList []Item `json:"immutableList"`
 
 	// Map where entries cannot be removed
+	// +k8s:optional
 	// +k8s:update=`NoRemoveItem`
 	NoRemoveMap map[string]string `json:"noRemoveMap"`
 
 	// Field that cannot be cleared once set (requiredOnceSet pattern)
 	// Note: This is a pointer field, so it needs special handling
+	// +k8s:optional
 	// +k8s:update=`NoUnset`
 	RequiredOnceSetField *string `json:"requiredOnceSetField"`
 
 	// Truly immutable field - whatever value it has at creation
 	// (set or unset) cannot be changed
-	// Note: removing +k8s:optional to avoid OptionalValue issues
+	// +k8s:optional
 	// +k8s:immutable
 	TrulyImmutableField string `json:"trulyImmutableField"`
 

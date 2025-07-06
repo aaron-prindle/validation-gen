@@ -57,8 +57,23 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoUnset(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.NoModify(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("setOnceField"), &obj.SetOnceField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.SetOnceField }))...)
 
@@ -68,7 +83,19 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoSet(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("createOnlyField"), &obj.CreateOnlyField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.CreateOnlyField }))...)
 
@@ -78,8 +105,23 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoUnset(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.NoRemoveItem(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.NoRemoveItem(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("appendOnlyList"), obj.AppendOnlyList, safe.Field(oldObj, func(oldObj *UpdateTestStruct) []string { return oldObj.AppendOnlyList }))...)
 
@@ -89,8 +131,23 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoAddItem(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.NoRemoveItem(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoAddItem(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.NoRemoveItem(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("immutableList"), obj.ImmutableList, safe.Field(oldObj, func(oldObj *UpdateTestStruct) []Item { return oldObj.ImmutableList }))...)
 
@@ -100,7 +157,19 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoRemoveItemMap(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoRemoveItemMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("noRemoveMap"), obj.NoRemoveMap, safe.Field(oldObj, func(oldObj *UpdateTestStruct) map[string]string { return oldObj.NoRemoveMap }))...)
 
@@ -110,7 +179,19 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.NoUnset(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("requiredOnceSetField"), obj.RequiredOnceSetField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.RequiredOnceSetField }))...)
 
@@ -120,7 +201,19 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("trulyImmutableField"), &obj.TrulyImmutableField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.TrulyImmutableField }))...)
 
@@ -132,6 +225,10 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 			}
 			{
 				earlyReturn := false
+				if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
 				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -140,7 +237,6 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 					return // do not proceed
 				}
 			}
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("requiredImmutableField"), &obj.RequiredImmutableField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.RequiredImmutableField }))...)
 

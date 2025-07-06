@@ -53,7 +53,16 @@ func Validate_ImmutableType(ctx context.Context, op operation.Operation, fldPath
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+	{
+		earlyReturn := false
+		if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			errs = append(errs, e...)
+			earlyReturn = true
+		}
+		if earlyReturn {
+			return // do not proceed
+		}
+	}
 
 	return errs
 }
@@ -67,7 +76,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }))...)
 
@@ -77,7 +95,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByCompare(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
 
@@ -87,7 +114,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("structField"), &obj.StructField, safe.Field(oldObj, func(oldObj *Struct) *ComparableStruct { return &oldObj.StructField }))...)
 
@@ -97,7 +133,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("structPtrField"), obj.StructPtrField, safe.Field(oldObj, func(oldObj *Struct) *ComparableStruct { return oldObj.StructPtrField }))...)
 
@@ -107,7 +152,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("noncomparableStructField"), &obj.NonComparableStructField, safe.Field(oldObj, func(oldObj *Struct) *NonComparableStruct { return &oldObj.NonComparableStructField }))...)
 
@@ -117,7 +171,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("noncomparableStructPtrField"), obj.NonComparableStructPtrField, safe.Field(oldObj, func(oldObj *Struct) *NonComparableStruct { return oldObj.NonComparableStructPtrField }))...)
 
@@ -127,7 +190,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }))...)
 
@@ -137,7 +209,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj)...)
+			{
+				earlyReturn := false
+				if e := validate.ImmutableByReflect(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
 
