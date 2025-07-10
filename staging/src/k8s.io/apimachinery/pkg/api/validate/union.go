@@ -37,11 +37,8 @@ type UnionValidationOptions struct {
 	// ErrorForEmpty returns error when no fields are set (nil means no error)
 	ErrorForEmpty func(fldPath *field.Path, allFields []string) *field.Error
 
-	// ErrorForMultiple returns error when multiple fields are set
+	// ErrorForMultiple returns error when multiple fields are set (nil means no error)
 	ErrorForMultiple func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error
-
-	// ErrorForMissingRequired returns error when a required field is missing (for discriminated unions)
-	ErrorForMissingRequired func(fldPath *field.Path, fieldName string, discriminatorName string, discriminatorValue string) *field.Error
 }
 
 // Union verifies that exactly one member of a union is specified.
@@ -71,8 +68,7 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 		},
 	}
 
-	errs := unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...)
-	return errs
+	return unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...)
 }
 
 // DiscriminatedUnion verifies specified union member matches the discriminator.
@@ -95,18 +91,42 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
 func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], isSetFns ...ExtractorFn[T, bool]) (errs field.ErrorList) {
-	options := UnionValidationOptions{
-		ErrorForMultiple: func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error {
-			return field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
-				fmt.Sprintf("must specify exactly one of: %s", strings.Join(allFields, ", ")))
-		},
-		ErrorForMissingRequired: func(fldPath *field.Path, fieldName string, discriminatorName string, discriminatorValue string) *field.Error {
-			return field.Invalid(fldPath, "",
-				fmt.Sprintf("must be specified when `%s` is %q", discriminatorName, discriminatorValue))
-		},
+	if len(union.members) != len(isSetFns) {
+		return field.ErrorList{
+			field.InternalError(fldPath,
+				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
+					len(isSetFns), len(union.members))),
+		}
+	}
+	var changed bool
+	discriminatorValue := discriminatorExtractor(obj)
+	if op.Type == operation.Update {
+		oldDiscriminatorValue := discriminatorExtractor(oldObj)
+		changed = discriminatorValue != oldDiscriminatorValue
 	}
 
-	return discriminatedUnionValidate(op, fldPath, obj, oldObj, union, options, discriminatorExtractor, isSetFns...)
+	for i, fieldIsSet := range isSetFns {
+		member := union.members[i]
+		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
+		newIsSet := fieldIsSet(obj)
+		if op.Type == operation.Update && !changed {
+			oldIsSet := fieldIsSet(oldObj)
+			changed = changed || newIsSet != oldIsSet
+		}
+		if newIsSet && !isDiscriminatedMember {
+			errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
+				fmt.Sprintf("may only be specified when `%s` is %q", union.discriminatorName, member.discriminatorValue)))
+		} else if !newIsSet && isDiscriminatedMember {
+			errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
+				fmt.Sprintf("must be specified when `%s` is %q", union.discriminatorName, discriminatorValue)))
+		}
+	}
+	// If the union discriminator and membership is unchanged, we don't need to
+	// re-validate.
+	if op.Type == operation.Update && !changed {
+		return nil
+	}
+	return errs
 }
 
 type member struct {
@@ -140,6 +160,16 @@ func NewDiscriminatedUnionMembership(discriminatorFieldName string, members ...[
 	return u
 }
 
+// allFields returns a string listing all the field names of the member of a union for use in error reporting.
+func (u UnionMembership) allFields() []string {
+	memberNames := make([]string, 0, len(u.members))
+	for _, f := range u.members {
+		memberNames = append(memberNames, fmt.Sprintf("`%s`", f.fieldName))
+	}
+	return memberNames
+}
+
+// unionValidate is the shared validation logic for union types
 func unionValidate[T any](op operation.Operation, fldPath *field.Path,
 	obj, oldObj T, union *UnionMembership, options UnionValidationOptions, isSetFns ...ExtractorFn[T, bool],
 ) field.ErrorList {
@@ -180,68 +210,4 @@ func unionValidate[T any](op operation.Operation, fldPath *field.Path,
 	}
 
 	return errs
-}
-
-func discriminatedUnionValidate[T any, D ~string](op operation.Operation, fldPath *field.Path,
-	obj, oldObj T, union *UnionMembership, options UnionValidationOptions, discriminatorExtractor ExtractorFn[T, D], isSetFns ...ExtractorFn[T, bool],
-) field.ErrorList {
-	if len(union.members) != len(isSetFns) {
-		return field.ErrorList{
-			field.InternalError(fldPath,
-				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
-					len(isSetFns), len(union.members))),
-		}
-	}
-	var changed bool
-	discriminatorValue := discriminatorExtractor(obj)
-	if op.Type == operation.Update {
-		oldDiscriminatorValue := discriminatorExtractor(oldObj)
-		changed = discriminatorValue != oldDiscriminatorValue
-	}
-
-	var specifiedFields []string
-	var errs field.ErrorList
-	hasDiscriminatorError := false
-
-	for i, fieldIsSet := range isSetFns {
-		member := union.members[i]
-		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
-		newIsSet := fieldIsSet(obj)
-		if op.Type == operation.Update && !changed {
-			oldIsSet := fieldIsSet(oldObj)
-			changed = changed || newIsSet != oldIsSet
-		}
-
-		if newIsSet {
-			specifiedFields = append(specifiedFields, member.fieldName)
-			if !isDiscriminatedMember {
-				errs = append(errs, field.Invalid(fldPath.Child(member.fieldName), "",
-					fmt.Sprintf("may only be specified when `%s` is %q", union.discriminatorName, member.discriminatorValue)))
-				hasDiscriminatorError = true
-			}
-		} else if isDiscriminatedMember && options.ErrorForMissingRequired != nil {
-			errs = append(errs, options.ErrorForMissingRequired(fldPath.Child(member.fieldName), member.fieldName, union.discriminatorName, string(discriminatorValue)))
-		}
-	}
-
-	// If the union discriminator and membership is unchanged, we don't need to
-	// re-validate.
-	if op.Type == operation.Update && !changed {
-		return nil
-	}
-
-	if !hasDiscriminatorError && len(specifiedFields) > 1 && options.ErrorForMultiple != nil {
-		errs = append(errs, options.ErrorForMultiple(fldPath, specifiedFields, union.allFields()))
-	}
-
-	return errs
-}
-
-// allFields returns a string listing all the field names of the member of a union for use in error reporting.
-func (u UnionMembership) allFields() []string {
-	memberNames := make([]string, 0, len(u.members))
-	for _, f := range u.members {
-		memberNames = append(memberNames, fmt.Sprintf("`%s`", f.fieldName))
-	}
-	return memberNames
 }

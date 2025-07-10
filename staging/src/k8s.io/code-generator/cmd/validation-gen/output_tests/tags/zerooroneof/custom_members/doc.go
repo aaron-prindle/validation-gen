@@ -24,12 +24,11 @@ import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-// Discriminated zero-or-one-of union with custom member names
+// Non-discriminated zero-or-one-of union with custom member names
 type Struct struct {
 	TypeMeta int
 
-	// +k8s:zeroOrOneOfDiscriminator
-	D D `json:"d"`
+	NonUnionField string `json:"nonUnionField"`
 
 	// +k8s:zeroOrOneOfMember(memberName: "CustomM1")
 	// +k8s:optional
@@ -39,13 +38,6 @@ type Struct struct {
 	// +k8s:optional
 	M2 *M2 `json:"m2"`
 }
-
-type D string
-
-const (
-	DM1 D = "CustomM1"
-	DM2 D = "CustomM2"
-)
 
 type M1 struct{}
 

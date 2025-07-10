@@ -27,11 +27,11 @@ import (
 
 // ZeroOrOneOfUnion verifies that at most one member of a union is specified.
 //
-// UnionMembership must define all the members of the union.
+// ZeroOrOneOfMembership must define all the members of the union.
 //
 // For example:
 //
-//	var UnionMembershipForABC := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
+//	var ZeroOrOneOfMembershipFor := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
 //		errs = append(errs, ZeroOrOneOfUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) bool { return in.A != nil },
@@ -40,7 +40,7 @@ import (
 //		)...)
 //		return errs
 //	}
-func ZeroOrOneOfUnion[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, isSetFns ...ExtractorFn[T, bool]) field.ErrorList {
+func ZeroOrOneOfUnion[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, isSetFns ...ExtractorFn[T, bool]) field.ErrorList {
 	options := UnionValidationOptions{
 		ErrorForEmpty: nil,
 		ErrorForMultiple: func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error {
@@ -51,41 +51,4 @@ func ZeroOrOneOfUnion[T any](ctx context.Context, op operation.Operation, fldPat
 
 	errs := unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...)
 	return errs
-}
-
-// ZeroOrOneOfDiscriminatedUnion verifies specified union member matches the discriminator, allowing empty unions.
-//
-// UnionMembership must define all the members of the union and the discriminator.
-//
-// For example:
-//
-//	var UnionMembershipForABC := validate.NewDiscriminatedUnionMembership("type", [2]string{"a", "A"}, [2]string{"b" "B"}, [2]string{"c", "C"})
-//	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, ZeroOrOneOfDiscriminatedUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
-//			func(in *ABC) string { return string(in.Type) },
-//			func(in *ABC) bool { return in.A != nil },
-//			func(in *ABC) bool { return in.B != ""},
-//			func(in *ABC) bool { return in.C != 0 },
-//		)...)
-//		return errs
-//	}
-//
-// When the discriminator is empty, no fields are required to be set.
-// When the discriminator is set, at most one field matching that discriminator value may be set.
-func ZeroOrOneOfDiscriminatedUnion[T any, D ~string](ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], isSetFns ...ExtractorFn[T, bool]) (errs field.ErrorList) {
-	options := UnionValidationOptions{
-		ErrorForMultiple: func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error {
-			return field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
-				fmt.Sprintf("must specify at most one of: %s", strings.Join(allFields, ", ")))
-		},
-		ErrorForMissingRequired: nil,
-	}
-
-	// Special handling for empty discriminator
-	discriminatorValue := discriminatorExtractor(obj)
-	if string(discriminatorValue) == "" {
-		return ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, union, isSetFns...)
-	}
-
-	return discriminatedUnionValidate(op, fldPath, obj, oldObj, union, options, discriminatorExtractor, isSetFns...)
 }

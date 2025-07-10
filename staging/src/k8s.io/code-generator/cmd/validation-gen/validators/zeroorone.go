@@ -23,7 +23,6 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-var zeroOrOneOfDiscriminatedUnionValidator = types.Name{Package: libValidationPkg, Name: "ZeroOrOneOfDiscriminatedUnion"}
 var zeroOrOneOfUnionValidator = types.Name{Package: libValidationPkg, Name: "ZeroOrOneOfUnion"}
 var zeroOrOneOfVariablePrefix = "zeroOrOneOfMembershipFor"
 
@@ -33,7 +32,6 @@ func init() {
 	// actually pertains to the struct itself.
 	shared := map[*types.Type]unions{}
 	RegisterTypeValidator(zeroOrOneOfTypeValidator{shared})
-	RegisterTagValidator(zeroOrOneOfDiscriminatorTagValidator{shared})
 	RegisterTagValidator(zeroOrOneOfMemberTagValidator{shared})
 }
 
@@ -62,53 +60,12 @@ func (ztv zeroOrOneOfTypeValidator) GetValidations(context Context) (Validations
 	}
 
 	return processUnionValidations(context, unions, zeroOrOneOfVariablePrefix,
-		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, zeroOrOneOfDiscriminatedUnionValidator)
+		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{})
 }
 
 const (
-	zeroOrOneOfDiscriminatorTagName = "k8s:zeroOrOneOfDiscriminator"
-	zeroOrOneOfMemberTagName        = "k8s:zeroOrOneOfMember"
+	zeroOrOneOfMemberTagName = "k8s:zeroOrOneOfMember"
 )
-
-type zeroOrOneOfDiscriminatorTagValidator struct {
-	shared map[*types.Type]unions
-}
-
-func (zeroOrOneOfDiscriminatorTagValidator) Init(_ Config) {}
-
-func (zeroOrOneOfDiscriminatorTagValidator) TagName() string {
-	return zeroOrOneOfDiscriminatorTagName
-}
-
-// Shared between zeroOrOneOfDiscriminatorTagValidator and zeroOrOneOfMemberTagValidator.
-func (zeroOrOneOfDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
-	return unionTagValidScopes
-}
-
-func (zdtv zeroOrOneOfDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	err := processDiscriminatorValidations(zdtv.shared, context, tag)
-	if err != nil {
-		return Validations{}, err
-	}
-	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the zeroOrOneOfTypeValidator.
-	return Validations{}, nil
-}
-
-func (zdtv zeroOrOneOfDiscriminatorTagValidator) Docs() TagDoc {
-	return TagDoc{
-		Tag:         zdtv.TagName(),
-		Scopes:      zdtv.ValidScopes().UnsortedList(),
-		Description: "Indicates that this field is the discriminator for a zero-or-one-of union.",
-		Docs:        "A zero-or-one-of union allows at most one member to be set. When the discriminator is empty, no members need to be set.",
-		Args: []TagArgDoc{{
-			Name:        "union",
-			Description: "<string>",
-			Docs:        "the name of the union, if more than one exists",
-			Type:        codetags.ArgTypeString,
-		}},
-	}
-}
 
 type zeroOrOneOfMemberTagValidator struct {
 	shared map[*types.Type]unions
@@ -148,7 +105,7 @@ func (zmtv zeroOrOneOfMemberTagValidator) Docs() TagDoc {
 		}, {
 			Name:        "memberName",
 			Description: "<string>",
-			Docs:        "the discriminator value for this member",
+			Docs:        "the custom member name for this member",
 			Default:     "the field's name",
 			Type:        codetags.ArgTypeString,
 		}},
