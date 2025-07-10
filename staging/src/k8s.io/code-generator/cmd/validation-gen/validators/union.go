@@ -32,6 +32,7 @@ var unionValidator = types.Name{Package: libValidationPkg, Name: "Union"}
 
 var newDiscriminatedUnionMembership = types.Name{Package: libValidationPkg, Name: "NewDiscriminatedUnionMembership"}
 var newUnionMembership = types.Name{Package: libValidationPkg, Name: "NewUnionMembership"}
+var unionVariablePrefix = "unionMembershipFor"
 
 func init() {
 	// Unions are comprised of multiple tags, which need to share information
@@ -54,82 +55,21 @@ func (unionTypeValidator) Name() string {
 }
 
 func (utv unionTypeValidator) GetValidations(context Context) (Validations, error) {
-	result := Validations{}
-
 	// Gengo does not treat struct definitions as aliases, which is
 	// inconsistent but unlikely to change. That means we don't REALLY need to
 	// handle it here, but let's be extra careful and extract the most concrete
 	// type possible.
 	if util.NonPointer(util.NativeType(context.Type)).Kind != types.Struct {
-		return result, nil
+		return Validations{}, nil
 	}
 
 	unions := utv.shared[context.Type]
 	if len(unions) == 0 {
-		return result, nil
+		return Validations{}, nil
 	}
 
-	// Sort the keys for stable output.
-	keys := make([]string, 0, len(unions))
-	for k := range unions {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, unionName := range keys {
-		u := unions[unionName]
-		if len(u.fieldMembers) > 0 || u.discriminator != nil {
-			// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
-			//       The correct package would be the output package but is not known here. This does not show up in generated code.
-			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
-			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
-
-			var extractorArgs []any
-			ptrType := types.PointerTo(context.Type)
-			for _, member := range u.fieldMembers {
-				extractor := FunctionLiteral{
-					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
-					Results:    []ParamResult{{Type: types.Bool}},
-				}
-				nt := util.NativeType(member.Type)
-				switch nt.Kind {
-				case types.Pointer, types.Map, types.Slice:
-					extractor.Body = fmt.Sprintf("if obj == nil {return false}; return obj.%s != nil", member.Name)
-				case types.Builtin:
-					extractor.Body = fmt.Sprintf("if obj == nil {return false}; var z %s; return obj.%s != z", member.Type, member.Name)
-				default:
-					// This should be caught before we get here, but JIC.
-					return Validations{}, fmt.Errorf("unsupported union member kind: %s", nt.Kind)
-				}
-				extractorArgs = append(extractorArgs, extractor)
-			}
-
-			if u.discriminator != nil {
-				supportVar := Variable(supportVarName,
-					Function(unionMemberTagName, DefaultFlags, newDiscriminatedUnionMembership,
-						append([]any{*u.discriminator}, toSliceAny(u.fields)...)...))
-				result.Variables = append(result.Variables, supportVar)
-
-				discriminatorExtractor := FunctionLiteral{
-					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
-					Results:    []ParamResult{{Type: types.String}},
-					Body:       fmt.Sprintf("if obj == nil {return \"\"}; return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
-				}
-
-				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
-				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extraArgs...)
-				result.Functions = append(result.Functions, fn)
-			} else {
-				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, toSliceAny(u.fields)...))
-				result.Variables = append(result.Variables, supportVar)
-
-				extraArgs := append([]any{supportVarName}, extractorArgs...)
-				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extraArgs...)
-				result.Functions = append(result.Functions, fn)
-			}
-		}
-	}
-
-	return result, nil
+	return processUnionValidations(context, unions, unionVariablePrefix,
+		unionMemberTagName, unionValidator, discriminatedUnionValidator)
 }
 
 func toSliceAny[T any](t []T) []any {
@@ -163,24 +103,10 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// This tag can apply to value and pointer fields, as well as typedefs
-	// (which should never be pointers). We need to check the concrete type.
-	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	err := processDiscriminatorValidations(udtv.shared, context, tag)
+	if err != nil {
+		return Validations{}, err
 	}
-	if udtv.shared[context.Parent] == nil {
-		udtv.shared[context.Parent] = unions{}
-	}
-	unionArg, _ := tag.NamedArg("union") // optional
-	u := udtv.shared[context.Parent].getOrCreate(unionArg.Value)
-
-	var discriminatorFieldName string
-	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
-		discriminatorFieldName = jsonAnnotation.Name
-		u.discriminator = &discriminatorFieldName
-		u.discriminatorMember = context.Member
-	}
-
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeValidator.
 	return Validations{}, nil
@@ -215,40 +141,10 @@ func (unionMemberTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	nt := util.NativeType(context.Member.Type)
-	switch nt.Kind {
-	case types.Pointer, types.Map, types.Slice, types.Builtin:
-		// OK
-	default:
-		// In particular non-pointer structs are not supported.
-		return Validations{}, fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
+	err := processMemberValidations(umtv.shared, context, tag)
+	if err != nil {
+		return Validations{}, err
 	}
-
-	var fieldName string
-	jsonTag, ok := tags.LookupJSON(*context.Member)
-	if !ok {
-		return Validations{}, fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member)
-	}
-	fieldName = jsonTag.Name
-	if len(fieldName) == 0 {
-		return Validations{}, fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
-	}
-
-	if umtv.shared[context.Parent] == nil {
-		umtv.shared[context.Parent] = unions{}
-	}
-	unionArg, _ := tag.NamedArg("union") // optional
-	var memberName string
-	if memberNameArg, ok := tag.NamedArg("memberName"); ok { // optional
-		memberName = memberNameArg.Value
-	} else {
-		memberName = context.Member.Name // default
-	}
-
-	u := umtv.shared[context.Parent].getOrCreate(unionArg.Value)
-	u.fields = append(u.fields, [2]string{fieldName, memberName})
-	u.fieldMembers = append(u.fieldMembers, context.Member)
-
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeValidator.
 	return Validations{}, nil
@@ -304,4 +200,141 @@ func (us unions) getOrCreate(name string) *union {
 		us[name] = u
 	}
 	return u
+}
+
+// processUnionValidations is the shared implementation for GetValidations
+func processUnionValidations(context Context, unions unions, varPrefix string,
+	tagName string, undiscriminatedValidator types.Name, discriminatedValidator types.Name,
+) (Validations, error) {
+	result := Validations{}
+
+	// Sort the keys for stable output.
+	keys := make([]string, 0, len(unions))
+	for k := range unions {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, unionName := range keys {
+		u := unions[unionName]
+		if len(u.fieldMembers) > 0 || u.discriminator != nil {
+			// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
+			//       The correct package would be the output package but is not known here. This does not show up in generated code.
+			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
+			supportVarName := PrivateVar{Name: varPrefix + context.Type.Name.Name + unionName, Package: "local"}
+
+			var extractorArgs []any
+			ptrType := types.PointerTo(context.Type)
+			for _, member := range u.fieldMembers {
+				extractor := createMemberExtractor(ptrType, member)
+				extractorArgs = append(extractorArgs, extractor)
+			}
+
+			if u.discriminator != nil {
+				supportVar := Variable(supportVarName,
+					Function(tagName, DefaultFlags, newDiscriminatedUnionMembership,
+						append([]any{*u.discriminator}, toSliceAny(u.fields)...)...))
+				result.Variables = append(result.Variables, supportVar)
+
+				discriminatorExtractor := FunctionLiteral{
+					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+					Results:    []ParamResult{{Type: types.String}},
+					Body:       fmt.Sprintf("if obj == nil {return \"\"}; return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
+				}
+
+				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
+				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
+				result.Functions = append(result.Functions, fn)
+			} else {
+				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, toSliceAny(u.fields)...))
+				result.Variables = append(result.Variables, supportVar)
+
+				extraArgs := append([]any{supportVarName}, extractorArgs...)
+				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
+				result.Functions = append(result.Functions, fn)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// createMemberExtractor creates an extractor function for a union member
+func createMemberExtractor(ptrType *types.Type, member *types.Member) FunctionLiteral {
+	extractor := FunctionLiteral{
+		Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+		Results:    []ParamResult{{Type: types.Bool}},
+	}
+	nt := util.NativeType(member.Type)
+	switch nt.Kind {
+	case types.Pointer, types.Map, types.Slice:
+		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return obj.%s != nil", member.Name)
+	case types.Builtin:
+		extractor.Body = fmt.Sprintf("if obj == nil {return false}; var z %s; return obj.%s != z", member.Type, member.Name)
+	default:
+		// This should be caught before we get here, but JIC.
+		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return false /* unsupported union member kind: %s */", nt.Kind)
+	}
+	return extractor
+}
+
+// processDiscriminatorValidations is the shared implementation for discriminator GetValidations
+func processDiscriminatorValidations(shared map[*types.Type]unions, context Context, tag codetags.Tag) error {
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
+		return fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	}
+	if shared[context.Parent] == nil {
+		shared[context.Parent] = unions{}
+	}
+	unionArg, _ := tag.NamedArg("union") // optional
+	u := shared[context.Parent].getOrCreate(unionArg.Value)
+
+	var discriminatorFieldName string
+	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
+		discriminatorFieldName = jsonAnnotation.Name
+		u.discriminator = &discriminatorFieldName
+		u.discriminatorMember = context.Member
+	}
+
+	return nil
+}
+
+// processMemberValidations is the shared implementation for member GetValidations
+func processMemberValidations(shared map[*types.Type]unions, context Context, tag codetags.Tag) error {
+	nt := util.NativeType(context.Member.Type)
+	switch nt.Kind {
+	case types.Pointer, types.Map, types.Slice, types.Builtin:
+		// OK
+	default:
+		// In particular non-pointer structs are not supported.
+		return fmt.Errorf("can only be used on nilable and primitive types (%s)", nt.Kind)
+	}
+
+	var fieldName string
+	jsonTag, ok := tags.LookupJSON(*context.Member)
+	if !ok {
+		return fmt.Errorf("field %q is a union member but has no JSON struct field tag", context.Member)
+	}
+	fieldName = jsonTag.Name
+	if len(fieldName) == 0 {
+		return fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
+	}
+
+	if shared[context.Parent] == nil {
+		shared[context.Parent] = unions{}
+	}
+	unionArg, _ := tag.NamedArg("union") // optional
+	var memberName string
+	if memberNameArg, ok := tag.NamedArg("memberName"); ok { // optional
+		memberName = memberNameArg.Value
+	} else {
+		memberName = context.Member.Name // default
+	}
+
+	u := shared[context.Parent].getOrCreate(unionArg.Value)
+	u.fields = append(u.fields, [2]string{fieldName, memberName})
+	u.fieldMembers = append(u.fieldMembers, context.Member)
+
+	return nil
 }

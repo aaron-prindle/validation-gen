@@ -32,6 +32,15 @@ import (
 // extractor.
 type ExtractorFn[T, V any] func(obj T) V
 
+// UnionValidationOptions configures how union validation behaves
+type UnionValidationOptions struct {
+	// ErrorForEmpty returns error when no fields are set (nil means no error)
+	ErrorForEmpty func(fldPath *field.Path, allFields []string) *field.Error
+
+	// ErrorForMultiple returns error when multiple fields are set (nil means no error)
+	ErrorForMultiple func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error
+}
+
 // Union verifies that exactly one member of a union is specified.
 //
 // UnionMembership must define all the members of the union.
@@ -48,41 +57,18 @@ type ExtractorFn[T, V any] func(obj T) V
 //		return errs
 //	}
 func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, isSetFns ...ExtractorFn[T, bool]) field.ErrorList {
-	if len(union.members) != len(isSetFns) {
-		return field.ErrorList{
-			field.InternalError(fldPath,
-				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
-					len(isSetFns), len(union.members))),
-		}
+	options := UnionValidationOptions{
+		ErrorForEmpty: func(fldPath *field.Path, allFields []string) *field.Error {
+			return field.Invalid(fldPath, "",
+				fmt.Sprintf("must specify one of: %s", strings.Join(allFields, ", ")))
+		},
+		ErrorForMultiple: func(fldPath *field.Path, specifiedFields []string, allFields []string) *field.Error {
+			return field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
+				fmt.Sprintf("must specify exactly one of: %s", strings.Join(allFields, ", ")))
+		},
 	}
-	var specifiedFields []string
-	var changed bool
-	for i, fieldIsSet := range isSetFns {
-		newIsSet := fieldIsSet(obj)
-		if op.Type == operation.Update && !changed {
-			oldIsSet := fieldIsSet(oldObj)
-			changed = changed || newIsSet != oldIsSet
-		}
-		if newIsSet {
-			specifiedFields = append(specifiedFields, union.members[i].fieldName)
-		}
-	}
-	// If the union membership is unchanged, we don't need to re-validate.
-	if op.Type == operation.Update && !changed {
-		return nil
-	}
-	if len(specifiedFields) > 1 {
-		return field.ErrorList{
-			field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
-				fmt.Sprintf("must specify exactly one of: %s", strings.Join(union.allFields(), ", "))),
-		}
-	}
-	if len(specifiedFields) == 0 {
-		return field.ErrorList{field.Invalid(fldPath, "",
-			fmt.Sprintf("must specify one of: %s",
-				strings.Join(union.allFields(), ", ")))}
-	}
-	return nil
+
+	return unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...)
 }
 
 // DiscriminatedUnion verifies specified union member matches the discriminator.
@@ -181,4 +167,47 @@ func (u UnionMembership) allFields() []string {
 		memberNames = append(memberNames, fmt.Sprintf("`%s`", f.fieldName))
 	}
 	return memberNames
+}
+
+// unionValidate is the shared validation logic for union types
+func unionValidate[T any](op operation.Operation, fldPath *field.Path,
+	obj, oldObj T, union *UnionMembership, options UnionValidationOptions, isSetFns ...ExtractorFn[T, bool],
+) field.ErrorList {
+	if len(union.members) != len(isSetFns) {
+		return field.ErrorList{
+			field.InternalError(fldPath,
+				fmt.Errorf("number of extractors (%d) does not match number of union members (%d)",
+					len(isSetFns), len(union.members))),
+		}
+	}
+
+	var specifiedFields []string
+	var changed bool
+	for i, fieldIsSet := range isSetFns {
+		newIsSet := fieldIsSet(obj)
+		if op.Type == operation.Update && !changed {
+			oldIsSet := fieldIsSet(oldObj)
+			changed = changed || newIsSet != oldIsSet
+		}
+		if newIsSet {
+			specifiedFields = append(specifiedFields, union.members[i].fieldName)
+		}
+	}
+
+	// If the union membership is unchanged, we don't need to re-validate.
+	if op.Type == operation.Update && !changed {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	if len(specifiedFields) > 1 && options.ErrorForMultiple != nil {
+		errs = append(errs, options.ErrorForMultiple(fldPath, specifiedFields, union.allFields()))
+	}
+
+	if len(specifiedFields) == 0 && options.ErrorForEmpty != nil {
+		errs = append(errs, options.ErrorForEmpty(fldPath, union.allFields()))
+	}
+
+	return errs
 }
