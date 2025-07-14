@@ -19,6 +19,7 @@ package validate
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -72,6 +73,8 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 		return nil
 	}
 	if len(specifiedFields) > 1 {
+		// Sort specified fields for stable output
+		slices.Sort(specifiedFields)
 		return field.ErrorList{
 			field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
 				fmt.Sprintf("must specify exactly one of: %s", strings.Join(union.allFields(), ", "))),

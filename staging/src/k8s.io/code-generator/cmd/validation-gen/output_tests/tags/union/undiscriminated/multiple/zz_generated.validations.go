@@ -48,15 +48,15 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipForStructunion1 = validate.NewUnionMembership([2]string{"u1m1", "U1M1"}, [2]string{"u1m2", "U1M2"})
-var unionMembershipForStructunion2 = validate.NewUnionMembership([2]string{"u2m1", "U2M1"}, [2]string{"u2m2", "U2M2"})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_multiple_Struct_union1 = validate.NewUnionMembership([2]string{"u1m1", "U1M1"}, [2]string{"u1m2", "U1M2"})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_multiple_Struct_union2 = validate.NewUnionMembership([2]string{"u2m1", "U2M1"}, [2]string{"u2m2", "U2M2"})
 
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// type Struct
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion1, func(obj *Struct) bool {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_multiple_Struct_union1, func(obj *Struct) bool {
 		if obj == nil {
 			return false
 		}
@@ -67,7 +67,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 		}
 		return obj.U1M2 != nil
 	})...)
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipForStructunion2, func(obj *Struct) bool {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_undiscriminated_multiple_Struct_union2, func(obj *Struct) bool {
 		if obj == nil {
 			return false
 		}

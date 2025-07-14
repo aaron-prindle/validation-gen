@@ -48,14 +48,14 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipForStruct = validate.NewDiscriminatedUnionMembership("d", [2]string{"m1", "M1"})
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_discriminated_sparse_Struct_ = validate.NewDiscriminatedUnionMembership("d", [2]string{"m1", "M1"})
 
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// type Struct
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) string {
+	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_discriminated_sparse_Struct_, func(obj *Struct) string {
 		if obj == nil {
 			return ""
 		}
