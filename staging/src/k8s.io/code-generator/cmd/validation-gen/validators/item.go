@@ -42,6 +42,8 @@ type itemValidation struct {
 	matcherPairs []keyValuePair
 	// valueTag is the validation tag to apply to matched items
 	valueTag codetags.Tag
+	// matchers stores for union access (assign from matcherPairs)
+	matchers []keyValuePair
 }
 
 type itemMetadata struct {
@@ -119,9 +121,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		itv.byPath[context.Path.String()] = &itemMetadata{}
 	}
 
+	// Assign matchers from matcherPairs for union access
 	itv.byPath[context.Path.String()].items = append(itv.byPath[context.Path.String()].items, itemValidation{
 		matcherPairs: matcherPairs,
 		valueTag:     *tag.ValueTag,
+		matchers:     matcherPairs, // Copy for union
 	})
 
 	// This tag doesn't generate validations directly, the itemFieldValidator does.
@@ -258,11 +262,12 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 		// Extract validations from the stored tag
 		subContextPath := generateFieldPathForMap(item.matcherPairs)
 		subContext := Context{
-			Scope:  ScopeListVal,
-			Type:   elemT,
-			Parent: context.Type,
-			Path:   context.Path.Key(subContextPath),
-			Member: nil,
+			Scope:      ScopeListVal,
+			Type:       elemT,
+			Parent:     context.Type,
+			Path:       context.Path.Key(subContextPath),
+			ParentPath: context.Path,
+			Member:     nil,
 		}
 
 		validations, err := iv.validator.ExtractValidations(subContext, item.valueTag)
@@ -276,6 +281,9 @@ func (iv itemValidator) GetValidations(context Context) (Validations, error) {
 		if err != nil {
 			return Validations{}, err
 		}
+
+		// Assign matchers for union access (copy from matcherPairs)
+		item.matchers = item.matcherPairs
 
 		for _, vfn := range validations.Functions {
 			f := Function(
