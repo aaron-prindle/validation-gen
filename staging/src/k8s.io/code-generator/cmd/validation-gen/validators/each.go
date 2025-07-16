@@ -318,16 +318,19 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 			WithComment("listType=set requires unique values")
 		result.AddFunction(f)
 	}
-	if lm.declaredAsMap {
-		// TODO: There are some fields which are declared as maps which do not
-		// enforce uniqueness in manual validation. Those either need to not be
-		// maps or we need to allow types to opt-out from this validation.  SSA
-		// is also not able to handle these well.
-		matchArg := lm.makeListMapMatchFunc(nt.Elem)
-		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
-			WithComment("listType=map requires unique keys")
-		result.AddFunction(f)
-	}
+	// TODO: enable the following once we have a way to either opt-out from this validation
+	// or settle the decision on how to handle the ratcheting cases.
+	// if lm.declaredAsMap {
+	// TODO: There are some fields which are declared as maps which do not
+	// enforce uniqueness in manual validation. Those either need to not be
+	// maps or we need to allow types to opt-out from this validation.  SSA
+	// is also not able to handle these well.
+
+	// matchArg := lm.makeListMapMatchFunc(nt.Elem)
+	// f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
+	// 	WithComment("listType=map requires unique keys")
+	// result.AddFunction(f)
+	// }
 
 	return result, nil
 }
@@ -402,9 +405,9 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	elemContext := Context{
-		Type:   nt.Elem,
-		Parent: t, // possibly an alias
-		Path:   context.Path.Key("*"),
+		Type:       nt.Elem,
+		ParentPath: context.Path,
+		Path:       context.Path.Key("*"),
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -574,10 +577,10 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 	}
 
 	elemContext := Context{
-		Scope:  ScopeMapKey,
-		Type:   t.Elem,
-		Parent: t,
-		Path:   context.Path.Child("(keys)"),
+		Scope:      ScopeMapKey,
+		Type:       t.Elem,
+		ParentPath: context.Path,
+		Path:       context.Path.Child("(keys)"),
 	}
 
 	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
