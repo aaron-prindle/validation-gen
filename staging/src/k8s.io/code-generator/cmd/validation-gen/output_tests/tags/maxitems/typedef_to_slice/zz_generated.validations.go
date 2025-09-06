@@ -53,9 +53,15 @@ func Validate_Max0Type(ctx context.Context, op operation.Operation, fldPath *fie
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
-		errs = append(errs, e...)
-		return // do not proceed
+	{
+		earlyReturn := false
+		if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+			errs = append(errs, e...)
+			earlyReturn = true
+		}
+		if earlyReturn {
+			return // do not proceed
+		}
 	}
 
 	return errs
@@ -66,9 +72,15 @@ func Validate_Max0TypedefType(ctx context.Context, op operation.Operation, fldPa
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
-		errs = append(errs, e...)
-		return // do not proceed
+	{
+		earlyReturn := false
+		if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
+			errs = append(errs, e...)
+			earlyReturn = true
+		}
+		if earlyReturn {
+			return // do not proceed
+		}
 	}
 
 	return errs
@@ -79,9 +91,15 @@ func Validate_Max10Type(ctx context.Context, op operation.Operation, fldPath *fi
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
-		errs = append(errs, e...)
-		return // do not proceed
+	{
+		earlyReturn := false
+		if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
+			errs = append(errs, e...)
+			earlyReturn = true
+		}
+		if earlyReturn {
+			return // do not proceed
+		}
 	}
 
 	return errs
@@ -92,9 +110,15 @@ func Validate_Max10TypedefType(ctx context.Context, op operation.Operation, fldP
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
-		errs = append(errs, e...)
-		return // do not proceed
+	{
+		earlyReturn := false
+		if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10); len(e) != 0 {
+			errs = append(errs, e...)
+			earlyReturn = true
+		}
+		if earlyReturn {
+			return // do not proceed
+		}
 	}
 
 	return errs

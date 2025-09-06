@@ -359,12 +359,14 @@ const (
 	DefaultFlags FunctionFlags = 0
 
 	// ShortCircuit indicates that further validations should be skipped if
-	// this validator fails. Most validators are not fatal.
+	// this validator fails. If there are multiple validators with this flag
+	// set, they will ALL run, and if any of them fail, any non-short-circuit
+	// validators will be skipped.  Most validators are not short-circuit.
 	ShortCircuit FunctionFlags = 1 << iota
 
 	// NonError indicates that a failure of this validator should not be
 	// accumulated as an error, but should trigger other aspects of the failure
-	// path (e.g. early return when combined with ShortCircuit).
+	// path (specifically the early return when combined with ShortCircuit).
 	NonError
 )
 
