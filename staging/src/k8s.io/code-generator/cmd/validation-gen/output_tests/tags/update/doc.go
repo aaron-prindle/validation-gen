@@ -41,7 +41,7 @@ type UpdateTestStruct struct {
 
 	// Append-only list
 	// +k8s:optional
-	// +k8s:update=`NoRemoveItem,NoUnset`
+	// +k8s:update=`NoRemoveItem`
 	AppendOnlyList []string `json:"appendOnlyList"`
 
 	// Immutable list (no adds or removes)

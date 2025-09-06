@@ -110,10 +110,6 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					earlyReturn = true
 				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
 				if e := validate.NoRemoveItem(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true

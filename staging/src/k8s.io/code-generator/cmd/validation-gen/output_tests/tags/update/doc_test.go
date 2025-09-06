@@ -89,10 +89,9 @@ func TestUpdateTags(t *testing.T) {
 		field.Forbidden(field.NewPath("appendOnlyList"), "cannot remove items"),
 	)
 
-	// Cannot clear list - this triggers BOTH validators
+	// Cannot clear list
 	st.Value(&emptyList).OldValue(&withItems).ExpectInvalid(
 		field.Forbidden(field.NewPath("appendOnlyList"), "cannot remove items"),
-		field.Forbidden(field.NewPath("appendOnlyList"), "field cannot be cleared once set"),
 	)
 
 	// Test NoUnset (required once set)

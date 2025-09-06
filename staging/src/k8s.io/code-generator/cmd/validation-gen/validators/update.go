@@ -96,8 +96,39 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		}
 	}
 
+	// Validate constraints are appropriate for the field type
+	if err := utc.validateConstraintsForType(context, fm.updateConstraints); err != nil {
+		return Validations{}, err
+	}
+
 	// Don't generate validations here, just collect
 	return Validations{}, nil
+}
+
+func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []string) error {
+	t := util.NonPointer(util.NativeType(context.Type))
+	isCompound := t.Kind == types.Slice || t.Kind == types.Map
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case constraintNoAddItem, constraintNoRemoveItem:
+			// These can ONLY be used on lists/maps
+			if !isCompound {
+				return fmt.Errorf("+k8s:update=%s can only be used on list or map fields", constraint)
+			}
+		case constraintNoSet, constraintNoUnset:
+			// These CANNOT be used on lists/maps
+			if isCompound {
+				return fmt.Errorf("+k8s:update=%s cannot be used on list or map fields", constraint)
+			}
+		case constraintNoModify:
+			// NoModify can be used on any field type
+		default:
+			return fmt.Errorf("unknown +k8s:update constraint: %s", constraint)
+		}
+	}
+
+	return nil
 }
 
 func (utc updateTagCollector) Docs() TagDoc {
@@ -106,9 +137,10 @@ func (utc updateTagCollector) Docs() TagDoc {
 		Scopes:       utc.ValidScopes().UnsortedList(),
 		PayloadsType: codetags.ValueTypeString,
 		Description: "Provides fine-grained control over field update operations. " +
-			"Supported values: NoSet (prevents unset→set), NoUnset (prevents set→unset), " +
-			"NoModify (prevents value changes), NoAddItem (prevents adding to lists/maps), " +
-			"NoRemoveItem (prevents removing from lists/maps). " +
+			"For scalar fields: NoSet (prevents unset→set), NoUnset (prevents set→unset), " +
+			"NoModify (prevents value changes). " +
+			"For list/map fields: NoAddItem (prevents adding items), " +
+			"NoRemoveItem (prevents removing items). " +
 			"Multiple values can be specified separated by commas. " +
 			"Examples: +k8s:update=`NoModify,NoUnset` for set-once fields; " +
 			"+k8s:update=`NoRemoveItem` for append-only lists; " +
@@ -282,27 +314,39 @@ func (ufv updateFieldValidator) generateValidations(
 ) (Validations, error) {
 	var result Validations
 
+	// Get the type to determine if it's a compound type
+	t := util.NonPointer(util.NativeType(context.Type))
+	isCompound := t.Kind == types.Slice || t.Kind == types.Map
+
 	// IMPORTANT: Use ShortCircuit flag so these run in the same group as +k8s:optional
 	// This ensures that both validators get a chance to run before the early return decision
 
-	// Add basic validation functions
-	if !caps.canSet {
-		result.AddFunction(Function("update:NoSet", ShortCircuit, noSetValidator))
-	}
-	if !caps.canUnset {
-		result.AddFunction(Function("update:NoUnset", ShortCircuit, noUnsetValidator))
-	}
-	if !caps.canModify {
-		result.AddFunction(Function("update:NoModify", ShortCircuit, noModifyValidator))
+	// Add basic validation functions for scalar types only
+	if !isCompound {
+		if !caps.canSet {
+			result.AddFunction(Function("update:NoSet", ShortCircuit, noSetValidator))
+		}
+		if !caps.canUnset {
+			result.AddFunction(Function("update:NoUnset", ShortCircuit, noUnsetValidator))
+		}
+		if !caps.canModify {
+			result.AddFunction(Function("update:NoModify", ShortCircuit, noModifyValidator))
+		}
+	} else {
+		// For compound types, only NoModify is allowed from the basic validators
+		if !caps.canModify {
+			result.AddFunction(Function("update:NoModify", ShortCircuit, noModifyValidator))
+		}
 	}
 
-	// Handle compound types (lists and maps)
-	t := util.NonPointer(util.NativeType(context.Type))
-	switch t.Kind {
-	case types.Slice:
-		ufv.addSliceValidations(&result, caps, info.hasRequired)
-	case types.Map:
-		ufv.addMapValidations(&result, caps)
+	// Handle compound types (lists and maps) - only these get add/remove validators
+	if isCompound {
+		switch t.Kind {
+		case types.Slice:
+			ufv.addSliceValidations(&result, caps, info.hasRequired)
+		case types.Map:
+			ufv.addMapValidations(&result, caps)
+		}
 	}
 
 	return result, nil
