@@ -53,15 +53,17 @@ var (
 func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
+	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional
+	// This ensures both validators get a chance to run before early return
 	if util.IsDirectComparable(util.NonPointer(util.NativeType(context.Type))) {
 		// This is a minor optimization to just compare primitive values when
 		// possible. Slices and maps are not comparable, and structs might hold
 		// pointer fields, which are directly comparable but not what we need.
 		//
 		// Note: This compares the pointee, not the pointer itself.
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableCompareValidator))
+		result.AddFunction(Function(immutableTagName, ShortCircuit, immutableCompareValidator))
 	} else {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableReflectValidator))
+		result.AddFunction(Function(immutableTagName, ShortCircuit, immutableReflectValidator))
 	}
 
 	return result, nil
