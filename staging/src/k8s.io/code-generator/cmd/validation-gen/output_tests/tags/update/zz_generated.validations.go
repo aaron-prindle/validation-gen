@@ -38,6 +38,7 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type UpdateTestStruct
 	scheme.AddValidationFunc((*UpdateTestStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
 		case "/":
@@ -48,27 +49,25 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+// Validate_UpdateTestStruct validates an instance of UpdateTestStruct according
+// to declarative validation rules in the API schema.
 func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UpdateTestStruct) (errs field.ErrorList) {
 	// field UpdateTestStruct.TypeMeta has no validation
 
 	// field UpdateTestStruct.PrimitiveNoSet
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveNoSet"), &obj.PrimitiveNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveNoSet }))...)
@@ -76,21 +75,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PrimitiveNoUnset
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveNoUnset"), &obj.PrimitiveNoUnset, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveNoUnset }))...)
@@ -98,21 +93,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PrimitiveNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveNoModify"), &obj.PrimitiveNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveNoModify }))...)
@@ -120,29 +111,25 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PrimitiveFullyRestricted
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveFullyRestricted"), &obj.PrimitiveFullyRestricted, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveFullyRestricted }))...)
@@ -150,30 +137,26 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PrimitiveRequiredNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveRequiredNoModify"), &obj.PrimitiveRequiredNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveRequiredNoModify }))...)
@@ -181,25 +164,21 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PrimitiveSetOnce
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("primitiveSetOnce"), &obj.PrimitiveSetOnce, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.PrimitiveSetOnce }))...)
@@ -207,21 +186,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.IntNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("intNoModify"), &obj.IntNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int { return &oldObj.IntNoModify }))...)
@@ -229,21 +204,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.BoolNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("boolNoModify"), &obj.BoolNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *bool { return &oldObj.BoolNoModify }))...)
@@ -251,21 +222,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.Float64NoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *float64) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("float64NoModify"), &obj.Float64NoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *float64 { return &oldObj.Float64NoModify }))...)
@@ -273,31 +240,27 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultNoModify"), &obj.OptionalDefaultNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.OptionalDefaultNoModify }))...)
@@ -305,27 +268,23 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultNoSet
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultNoSet"), &obj.OptionalDefaultNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.OptionalDefaultNoSet }))...)
@@ -333,27 +292,23 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultNoUnset
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultNoUnset"), &obj.OptionalDefaultNoUnset, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return &oldObj.OptionalDefaultNoUnset }))...)
@@ -361,31 +316,27 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultIntNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultIntNoModify"), &obj.OptionalDefaultIntNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *int { return &oldObj.OptionalDefaultIntNoModify }))...)
@@ -393,31 +344,27 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultBoolNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultBoolNoModify"), &obj.OptionalDefaultBoolNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *bool { return &oldObj.OptionalDefaultBoolNoModify }))...)
@@ -425,18 +372,14 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.StructNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *TestStruct) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("structNoModify"), &obj.StructNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *TestStruct { return &oldObj.StructNoModify }))...)
@@ -444,21 +387,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PointerNoSet
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("pointerNoSet"), obj.PointerNoSet, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoSet }))...)
@@ -466,21 +405,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PointerNoUnset
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("pointerNoUnset"), obj.PointerNoUnset, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoUnset }))...)
@@ -488,21 +423,17 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PointerNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("pointerNoModify"), obj.PointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerNoModify }))...)
@@ -510,29 +441,25 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.PointerFullyRestricted
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("pointerFullyRestricted"), obj.PointerFullyRestricted, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.PointerFullyRestricted }))...)
@@ -540,31 +467,27 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.OptionalDefaultPointerNoModify
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				// optional fields with default values are effectively required
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			// optional fields with default values are effectively required
+			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoSet(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoUnset(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
+			}
+			if e := validate.NoModify(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("optionalDefaultPointerNoModify"), obj.OptionalDefaultPointerNoModify, safe.Field(oldObj, func(oldObj *UpdateTestStruct) *string { return oldObj.OptionalDefaultPointerNoModify }))...)
@@ -572,17 +495,13 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.ListField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) []string { return oldObj.ListField }))...)
@@ -590,17 +509,13 @@ func Validate_UpdateTestStruct(ctx context.Context, op operation.Operation, fldP
 	// field UpdateTestStruct.MapField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
+			// don't revalidate unchanged data
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil // no changes
+				return nil
 			}
-			{
-				earlyReturn := false
-				if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
+			// call field-attached validations
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
 			}
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *UpdateTestStruct) map[string]string { return oldObj.MapField }))...)

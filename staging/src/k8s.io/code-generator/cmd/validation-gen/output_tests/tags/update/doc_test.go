@@ -48,9 +48,9 @@ func TestUpdateTags(t *testing.T) {
 		new.PrimitiveNoSet = "value"
 
 		// Cannot set after creation (unset to set transition)
-		st.Value(&new).OldValue(&old).ExpectInvalid(
+		st.Value(&new).OldValue(&old).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveNoSet"), "field cannot be set once created"),
-		)
+		})
 
 		// Can remain unset
 		st.Value(&old).OldValue(&old).ExpectValid()
@@ -70,9 +70,9 @@ func TestUpdateTags(t *testing.T) {
 		st.Value(&oldWithValue).OldValue(&baseStruct).ExpectValid()
 
 		// Cannot unset (non-empty to empty)
-		st.Value(&newUnset).OldValue(&oldWithValue).ExpectInvalid(
+		st.Value(&newUnset).OldValue(&oldWithValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveNoUnset"), "field cannot be cleared once set"),
-		)
+		})
 
 		// Can keep the same value
 		st.Value(&newWithValue).OldValue(&oldWithValue).ExpectValid()
@@ -95,9 +95,9 @@ func TestUpdateTags(t *testing.T) {
 		st.Value(&oldEmpty).OldValue(&withValue).ExpectValid()
 
 		// Cannot modify (non-empty to different non-empty)
-		st.Value(&modified).OldValue(&withValue).ExpectInvalid(
+		st.Value(&modified).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	t.Run("Primitive Fully Restricted", func(t *testing.T) {
@@ -111,19 +111,19 @@ func TestUpdateTags(t *testing.T) {
 		modified.PrimitiveFullyRestricted = "different"
 
 		// Cannot set (NoSet)
-		st.Value(&withValue).OldValue(&oldEmpty).ExpectInvalid(
+		st.Value(&withValue).OldValue(&oldEmpty).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveFullyRestricted"), "field cannot be set once created"),
-		)
+		})
 
 		// If somehow set, cannot unset (NoUnset)
-		st.Value(&oldEmpty).OldValue(&withValue).ExpectInvalid(
+		st.Value(&oldEmpty).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveFullyRestricted"), "field cannot be cleared once set"),
-		)
+		})
 
 		// If somehow set, cannot modify (NoModify)
-		st.Value(&modified).OldValue(&withValue).ExpectInvalid(
+		st.Value(&modified).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveFullyRestricted"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	t.Run("Set-Once Pattern", func(t *testing.T) {
@@ -140,14 +140,14 @@ func TestUpdateTags(t *testing.T) {
 		st.Value(&withValue).OldValue(&oldEmpty).ExpectValid()
 
 		// Cannot unset (NoUnset)
-		st.Value(&oldEmpty).OldValue(&withValue).ExpectInvalid(
+		st.Value(&oldEmpty).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveSetOnce"), "field cannot be cleared once set"),
-		)
+		})
 
 		// Cannot modify (NoModify)
-		st.Value(&modified).OldValue(&withValue).ExpectInvalid(
+		st.Value(&modified).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("primitiveSetOnce"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	// Test different primitive types
@@ -165,9 +165,9 @@ func TestUpdateTags(t *testing.T) {
 		// Cannot modify from one non-zero to another
 		modified := baseStruct
 		modified.IntNoModify = 20
-		st.Value(&modified).OldValue(&withValue).ExpectInvalid(
+		st.Value(&modified).OldValue(&withValue).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("intNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	t.Run("Bool NoModify", func(t *testing.T) {
@@ -199,9 +199,9 @@ func TestUpdateTags(t *testing.T) {
 		// Cannot modify from default
 		modified := baseStruct
 		modified.OptionalDefaultNoModify = "different"
-		st.Value(&modified).OldValue(&baseStruct).ExpectInvalid(
+		st.Value(&modified).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("optionalDefaultNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	t.Run("Optional+Default NoSet", func(t *testing.T) {
@@ -226,9 +226,9 @@ func TestUpdateTags(t *testing.T) {
 		// Cannot modify from default (42)
 		modified := baseStruct
 		modified.OptionalDefaultIntNoModify = 100
-		st.Value(&modified).OldValue(&baseStruct).ExpectInvalid(
+		st.Value(&modified).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("optionalDefaultIntNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	t.Run("Optional+Default Bool NoModify", func(t *testing.T) {
@@ -239,9 +239,9 @@ func TestUpdateTags(t *testing.T) {
 		// Cannot modify from default
 		modified := baseStruct
 		modified.OptionalDefaultPointerNoModify = ptr.To("different")
-		st.Value(&modified).OldValue(&baseStruct).ExpectInvalid(
+		st.Value(&modified).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("optionalDefaultPointerNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	// Test Struct Fields
@@ -253,9 +253,9 @@ func TestUpdateTags(t *testing.T) {
 		modifiedStruct.StructNoModify = TestStruct{StringField: "different"}
 
 		// Cannot modify (struct fields are always set, never unset)
-		st.Value(&modifiedStruct).OldValue(&withStruct).ExpectInvalid(
+		st.Value(&modifiedStruct).OldValue(&withStruct).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("structNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	// Test Pointer Fields
@@ -264,9 +264,9 @@ func TestUpdateTags(t *testing.T) {
 		withSet.PointerNoSet = ptr.To("value")
 
 		// Cannot set after creation (nil to non-nil)
-		st.Value(&withSet).OldValue(&baseStruct).ExpectInvalid(
+		st.Value(&withSet).OldValue(&baseStruct).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("pointerNoSet"), "field cannot be set once created"),
-		)
+		})
 	})
 
 	t.Run("Pointer NoUnset", func(t *testing.T) {
@@ -277,9 +277,9 @@ func TestUpdateTags(t *testing.T) {
 		st.Value(&withPointer).OldValue(&baseStruct).ExpectValid()
 
 		// Cannot unset (non-nil to nil)
-		st.Value(&baseStruct).OldValue(&withPointer).ExpectInvalid(
+		st.Value(&baseStruct).OldValue(&withPointer).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("pointerNoUnset"), "field cannot be cleared once set"),
-		)
+		})
 	})
 
 	t.Run("Pointer NoModify", func(t *testing.T) {
@@ -296,9 +296,9 @@ func TestUpdateTags(t *testing.T) {
 		st.Value(&baseStruct).OldValue(&withPointer).ExpectValid()
 
 		// Cannot modify content
-		st.Value(&modifiedPointer).OldValue(&withPointer).ExpectInvalid(
+		st.Value(&modifiedPointer).OldValue(&withPointer).ExpectMatches(field.ErrorMatcher{}, field.ErrorList{
 			field.Forbidden(field.NewPath("pointerNoModify"), "field cannot be modified once set"),
-		)
+		})
 	})
 
 	// Lists and maps - ensure no update validators are generated

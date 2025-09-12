@@ -1272,74 +1272,66 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 // Emitted code assumes that the value in question is always a pair of nilable
 // variables named "obj" and "oldObj", and the field path to this value is
 // named "fldPath".
-// A corrected function that combines cohorts with your more robust short-circuit logic.
 func emitCallsToValidators(c *generator.Context, validations []validators.FunctionGen, sw *generator.SnippetWriter) {
-	// Group and sort the inputs into cohorts.
+	// Group and sort the inputs.
 	cohorts := sortIntoCohorts(validations)
 
-	for _, cohort := range cohorts {
-		cohortName := cohort[0].Cohort
+	for _, validations := range cohorts {
+		cohortName := validations[0].Cohort
 		if cohortName != "" {
 			sw.Do("func() { // cohort $.$\n", cohortName)
 		}
+		for _, v := range validations {
+			isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
+			isNonError := v.Flags.IsSet(validators.NonError)
 
-		// Separate short-circuit and regular validations within the cohort
-		shortCircuitValidations := []validators.FunctionGen{}
-		regularValidations := []validators.FunctionGen{}
-		for _, v := range cohort {
-			if v.Flags.IsSet(validators.ShortCircuit) {
-				shortCircuitValidations = append(shortCircuitValidations, v)
-			} else {
-				regularValidations = append(regularValidations, v)
+			targs := generator.Args{
+				"funcName": c.Universe.Type(v.Function),
+				"field":    mkSymbolArgs(c, fieldPkgSymbols),
 			}
-		}
 
-		// If there are any short-circuit validations, handle them as a group first.
-		if len(shortCircuitValidations) > 0 {
-			sw.Do("{\n", nil)
-			sw.Do("  earlyReturn := false\n", nil)
+			emitCall := func() {
+				sw.Do("$.funcName|raw$", targs)
+				if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
+					sw.Do("[", nil)
+					for i, typeArg := range typeArgs {
+						sw.Do("$.|raw$", c.Universe.Type(typeArg))
+						if i < len(typeArgs)-1 {
+							sw.Do(",", nil)
+						}
+					}
+					sw.Do("]", nil)
+				}
+				sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
+				for _, arg := range v.Args {
+					sw.Do(", ", nil)
+					toGolangSourceDataLiteral(sw, c, arg)
+				}
+				sw.Do(")", targs)
+			}
 
-			for _, v := range shortCircuitValidations {
-				isNonError := v.Flags.IsSet(validators.NonError)
-				targs := generator.Args{
-					"funcName": c.Universe.Type(v.Function),
-					"field":    mkSymbolArgs(c, fieldPkgSymbols),
-				}
-				// (emitCall logic as you had before)
-				emitCall := func() { ... } 
-				
-				for _, comment := range v.Comments {
-					sw.Do("// $.$\n", comment)
-				}
+			for _, comment := range v.Comments {
+				sw.Do("// $.$\n", comment)
+			}
+			if isShortCircuit {
 				sw.Do("if e := ", nil)
 				emitCall()
 				sw.Do("; len(e) != 0 {\n", nil)
 				if !isNonError {
 					sw.Do("errs = append(errs, e...)\n", nil)
 				}
-				sw.Do("    earlyReturn = true\n", nil)
+				sw.Do("    return // do not proceed\n", nil)
 				sw.Do("}\n", nil)
+			} else {
+				if isNonError {
+					emitCall()
+				} else {
+					sw.Do("errs = append(errs, ", nil)
+					emitCall()
+					sw.Do("...)\n", nil)
+				}
 			}
-			
-			sw.Do("  if earlyReturn {\n", nil)
-			sw.Do("    return // do not proceed\n", nil)
-			sw.Do("  }\n", nil)
-			sw.Do("}\n", nil)
 		}
-
-		// Now run the regular validations for the cohort.
-		for _, v := range regularValidations {
-			// (Standard logic for non-short-circuit validators)
-			emitCall := func() { ... } 
-			
-			for _, comment := range v.Comments {
-				sw.Do("// $.$\n", comment)
-			}
-			sw.Do("errs = append(errs, ", nil)
-			emitCall()
-			sw.Do("...)\n", nil)
-		}
-
 		if cohortName != "" {
 			sw.Do("}()\n", nil)
 		}
