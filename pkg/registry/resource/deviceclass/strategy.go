@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -48,9 +49,19 @@ func (deviceClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	dropDisabledFields(class, nil)
 }
 
-func (deviceClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+func (s deviceClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deviceClass := obj.(*resource.DeviceClass)
-	return validation.ValidateDeviceClass(deviceClass)
+	errorList := validation.ValidateDeviceClass(deviceClass)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, deviceClass, rest.WithTakeover(takeover))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover)
+		if takeover {
+			errorList = append(errorList.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return errorList
 }
 
 func (deviceClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -76,9 +87,22 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	}
 }
 
-func (deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateDeviceClass(obj.(*resource.DeviceClass))
-	return append(errorList, validation.ValidateDeviceClassUpdate(obj.(*resource.DeviceClass), old.(*resource.DeviceClass))...)
+func (s deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	newClass := obj.(*resource.DeviceClass)
+	oldClass := old.(*resource.DeviceClass)
+
+	errorList := validation.ValidateDeviceClass(newClass)
+	errorList = append(errorList, validation.ValidateDeviceClassUpdate(newClass, oldClass)...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newClass, oldClass, rest.WithTakeover(takeover))
+		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errorList, declarativeErrs, takeover)
+		if takeover {
+			errorList = append(errorList.RemoveCoveredByDeclarative(), declarativeErrs...)
+		}
+	}
+	return errorList
 }
 
 func (deviceClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
