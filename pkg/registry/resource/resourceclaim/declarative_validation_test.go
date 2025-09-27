@@ -175,6 +175,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			update: validClaim,
 			old:    validClaim,
 		},
+		"spec immutable": {
+			update: tweakSpec(validClaim, "another-class"),
+			old:    validClaim,
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "field is immutable", "").WithOrigin("immutable"),
+			},
+		},
 		// TODO: Add more test cases
 	}
 	for k, tc := range testCases {
@@ -416,5 +423,10 @@ func addStatusAllocationResult(obj resource.ResourceClaim) resource.ResourceClai
 				Device:  "device-1",
 			})
 	}
+	return obj
+}
+
+func tweakSpec(obj resource.ResourceClaim, deviceClassName string) resource.ResourceClaim {
+	obj.Spec.Devices.Requests[0].Exactly.DeviceClassName = deviceClassName
 	return obj
 }
