@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// UpdateConstraint represents a constraint on update operations
+// UpdateConstraint represents a constraint on update operations.
 type UpdateConstraint int
 
 const (
@@ -68,7 +68,40 @@ func UpdateValueByCompare[T comparable](_ context.Context, op operation.Operatio
 	return errs
 }
 
-// UpdatePointer verifies update constraints for pointer types.
+// UpdatePointerByCompare verifies update constraints for pointers to comparable
+// types.
+func UpdatePointerByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
+	if op.Type != operation.Update {
+		return nil
+	}
+
+	var errs field.ErrorList
+
+	for _, constraint := range constraints {
+		switch constraint {
+		case NoSet:
+			if oldValue == nil && value != nil {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be set once created").WithOrigin("update"))
+			}
+		case NoUnset:
+			if oldValue != nil && value == nil {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be cleared once set").WithOrigin("update"))
+			}
+		case NoModify:
+			// Rely on validation ratcheting to detect that the value has changed.
+			// This check only verifies that the field was non-nil in both the old
+			// and new objects, confirming it was a modification, not a set/unset.
+			if oldValue != nil && value != nil {
+				errs = append(errs, field.Invalid(fldPath, nil, "field cannot be modified once set").WithOrigin("update"))
+			}
+		}
+	}
+
+	return errs
+}
+
+// UpdatePointer verifies update constraints for pointer types using reflection.
+// It should be used for pointers to non-comparable types, like structs or slices.
 func UpdatePointer[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T, constraints ...UpdateConstraint) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil

@@ -152,10 +152,11 @@ func (updateFieldValidator) Name() string {
 }
 
 var (
-	updateValueValidator          = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
-	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
-	updateValueByReflectValidator = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
-	updateStructValidator         = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
+	updateValueValidator            = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
+	updatePointerValidator          = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
+	updatePointerByCompareValidator = types.Name{Package: libValidationPkg, Name: "UpdatePointerByCompare"}
+	updateValueByReflectValidator   = types.Name{Package: libValidationPkg, Name: "UpdateValueByReflect"}
+	updateStructValidator           = types.Name{Package: libValidationPkg, Name: "UpdateStruct"}
 
 	// Constraint constants that will be used as arguments
 	noSetConstraint    = types.Name{Package: libValidationPkg, Name: "NoSet"}
@@ -191,7 +192,11 @@ func (ufv updateFieldValidator) generateValidation(context Context, constraints 
 
 	var validatorFunc types.Name
 	if isPointer {
-		validatorFunc = updatePointerValidator
+		if isComparable {
+			validatorFunc = updatePointerByCompareValidator
+		} else {
+			validatorFunc = updatePointerValidator
+		}
 	} else if isStruct {
 		validatorFunc = updateStructValidator
 	} else if isComparable {
