@@ -1618,6 +1618,16 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				sw.Do("// $.$\n", comment)
 			}
 			sw.Do("$.funcName|raw$", targs)
+			if typeArgs := v.Function.TypeArgs; len(typeArgs) > 0 {
+				sw.Do("[", nil)
+				for i, typeArg := range typeArgs {
+					sw.Do("$.|raw$", c.Universe.Type(typeArg))
+					if i < len(typeArgs)-1 {
+						sw.Do(",", nil)
+					}
+				}
+				sw.Do("]", nil)
+			}
 		} else {
 			// If the function to be wrapped has additional arguments, we need
 			// a "standard signature" validation function to wrap it.
@@ -1643,6 +1653,68 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			emitFunctionCall(sw, c, v.Function, "ctx", "op", "fldPath", "obj", "oldObj")
 			sw.Do("\n}", targs)
 		}
+	case validators.MultiWrapperFunction:
+		targs := generator.Args{
+			"field":      mkSymbolArgs(c, fieldPkgSymbols),
+			"operation":  mkSymbolArgs(c, operationPkgSymbols),
+			"context":    mkSymbolArgs(c, contextPkgSymbols),
+			"objType":    v.ObjType,
+			"objTypePfx": "*",
+		}
+		if util.IsNilableType(v.ObjType) {
+			targs["objTypePfx"] = ""
+		}
+
+		sw.Do("func(", targs)
+		sw.Do("    ctx $.context.Context|raw$, ", targs)
+		sw.Do("    op $.operation.Operation|raw$, ", targs)
+		sw.Do("    fldPath *$.field.Path|raw$, ", targs)
+		sw.Do("    obj, oldObj $.objTypePfx$$.objType|raw$ ", targs)
+		sw.Do(")    $.field.ErrorList|raw$ {\n", targs)
+		sw.Do("errs := $.field.ErrorList|raw${}\n", targs)
+
+		hasShortCircuits := false
+		lastShortCircuitIdx := -1
+		for i, fg := range v.Functions {
+			if fg.Flags.IsSet(validators.ShortCircuit) {
+				hasShortCircuits = true
+				lastShortCircuitIdx = i
+			}
+		}
+		if hasShortCircuits {
+			sw.Do("earlyReturn := false\n", nil)
+		}
+
+		for i, fg := range v.Functions {
+			isShortCircuit := fg.Flags.IsSet(validators.ShortCircuit)
+			isNonError := fg.Flags.IsSet(validators.NonError)
+
+			if isShortCircuit {
+				sw.Do("if e := ", nil)
+				emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+				sw.Do("; len(e) != 0 {\n", nil)
+				if !isNonError {
+					sw.Do("  errs = append(errs, e...)\n", nil)
+				}
+				sw.Do("  earlyReturn = true\n", nil)
+				sw.Do("}\n", nil)
+
+				if i == lastShortCircuitIdx {
+					sw.Do("if earlyReturn {\n", nil)
+					sw.Do("  return errs\n", nil)
+					sw.Do("}\n", nil)
+				}
+			} else {
+				if isNonError {
+					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+				} else {
+					sw.Do("errs = append(errs, ", nil)
+					emitFunctionCall(sw, c, fg, "ctx", "op", "fldPath", "obj", "oldObj")
+					sw.Do("...)\n", nil)
+				}
+			}
+		}
+		sw.Do("return errs\n}", nil)
 	case validators.Literal:
 		sw.Do("$.$", v)
 	case validators.FunctionGen:
