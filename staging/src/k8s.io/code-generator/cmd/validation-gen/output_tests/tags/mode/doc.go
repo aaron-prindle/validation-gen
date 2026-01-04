@@ -17,8 +17,8 @@ limitations under the License.
 // +k8s:validation-gen=TypeMeta
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
-// Package patterns tests the various modal validation patterns.
-package patterns
+// Package mode tests the various modal validation patterns.
+package mode
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
