@@ -27,7 +27,7 @@ var localSchemeBuilder = testscheme.New()
 type StrictUnion struct {
 	TypeMeta int
 
-	// +k8s:mode
+	// +k8s:discriminator
 	Mode string `json:"mode"`
 
 	// +k8s:member("A")=+k8s:required
@@ -42,7 +42,7 @@ type StrictUnion struct {
 type SharedField struct {
 	TypeMeta int
 
-	// +k8s:mode
+	// +k8s:discriminator
 	Mode string `json:"mode"`
 
 	// Valid in A and B, forbidden in C.
@@ -55,7 +55,7 @@ type SharedField struct {
 type ChainedValidation struct {
 	TypeMeta int
 
-	// +k8s:mode
+	// +k8s:discriminator
 	Mode string `json:"mode"`
 
 	// In mode A, it is required AND must have maxLength 5.
@@ -67,7 +67,7 @@ type ChainedValidation struct {
 type ImplicitForbidden struct {
 	TypeMeta int
 
-	// +k8s:mode
+	// +k8s:discriminator
 	Mode string `json:"mode"`
 
 	// Field is only mentioned for mode A. Mode B should implicitly forbid it.
@@ -78,34 +78,34 @@ type ImplicitForbidden struct {
 type NonStringDiscriminator struct {
 	TypeMeta int
 
-	// +k8s:mode(name:"Bool")
+	// +k8s:discriminator(name:"Bool")
 	BoolMode bool `json:"boolMode"`
 
-	// +k8s:member(mode:"Bool", value:"true")=+k8s:required
-	// +k8s:member(mode:"Bool", value:"false")=+k8s:forbidden
+	// +k8s:member(discriminator:"Bool", value:"true")=+k8s:required
+	// +k8s:member(discriminator:"Bool", value:"false")=+k8s:forbidden
 	BoolField *string `json:"boolField,omitempty"`
 
-	// +k8s:mode(name:"Int")
+	// +k8s:discriminator(name:"Int")
 	IntMode int `json:"intMode"`
 
-	// +k8s:member(mode:"Int", value:"1")=+k8s:required
-	// +k8s:member(mode:"Int", value:"2")=+k8s:forbidden
+	// +k8s:member(discriminator:"Int", value:"1")=+k8s:required
+	// +k8s:member(discriminator:"Int", value:"2")=+k8s:forbidden
 	IntField *string `json:"intField,omitempty"`
 }
 
 type MultipleDiscriminators struct {
 	TypeMeta int
 
-	// +k8s:mode(name:"Net")
+	// +k8s:discriminator(name:"Net")
 	NetMode string `json:"netMode"`
 
-	// +k8s:mode(name:"Storage")
+	// +k8s:discriminator(name:"Storage")
 	StorageMode string `json:"storageMode"`
 
-	// +k8s:member(mode:"Net", value:"IPv6")=+k8s:required
+	// +k8s:member(discriminator:"Net", value:"IPv6")=+k8s:required
 	IPv6Config *string `json:"ipv6Config,omitempty"`
 
-	// +k8s:member(mode:"Storage", value:"S3")=+k8s:required
+	// +k8s:member(discriminator:"Storage", value:"S3")=+k8s:required
 	S3Bucket *string `json:"s3Bucket,omitempty"`
 }
 

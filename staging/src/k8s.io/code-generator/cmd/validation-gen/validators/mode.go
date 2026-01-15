@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	modeTagName   = "k8s:mode"
-	memberTagName = "k8s:member"
+	discriminatorTagName = "k8s:discriminator"
+	memberTagName        = "k8s:member"
 )
 
 func init() {
@@ -84,7 +84,7 @@ type modeTagValidator struct {
 func (mtv *modeTagValidator) Init(_ Config) {}
 
 func (mtv *modeTagValidator) TagName() string {
-	return modeTagName
+	return discriminatorTagName
 }
 
 func (mtv *modeTagValidator) ValidScopes() sets.Set[Scope] {
@@ -93,7 +93,7 @@ func (mtv *modeTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (mtv *modeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	if t := util.NonPointer(util.NativeType(context.Type)); t.Kind != types.Builtin || (t.Name.Name != "string" && t.Name.Name != "bool" && !isInteger(t)) {
-		return Validations{}, fmt.Errorf("mode discriminator must be a string, bool or integer type, got %s", t.Kind)
+		return Validations{}, fmt.Errorf("discriminator must be a string, bool or integer type, got %s", t.Kind)
 	}
 
 	if mtv.shared[context.ParentPath.String()] == nil {
@@ -105,7 +105,7 @@ func (mtv *modeTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	}
 	group := mtv.shared[context.ParentPath.String()].getOrCreate(modeName)
 	if group.discriminatorMember != nil && group.discriminatorMember != context.Member {
-		return Validations{}, fmt.Errorf("multiple discriminators for mode %q in the same struct", modeName)
+		return Validations{}, fmt.Errorf("multiple fields marked %q with the same name %q in the same struct", discriminatorTagName, modeName)
 	}
 	group.discriminatorMember = context.Member
 
@@ -125,11 +125,11 @@ func (mtv *modeTagValidator) Docs() TagDoc {
 		Tag:            mtv.TagName(),
 		StabilityLevel: Alpha,
 		Scopes:         mtv.ValidScopes().UnsortedList(),
-		Description:    "Indicates that this field is a mode discriminator.",
+		Description:    "Indicates that this field is a discriminator for state-based validation.",
 		Args: []TagArgDoc{{
 			Name:        "name",
 			Description: "<string>",
-			Docs:        "the name of the mode group, if more than one exists",
+			Docs:        "the name of the discriminator group, if more than one exists",
 			Type:        codetags.ArgTypeString,
 		}},
 	}
@@ -158,7 +158,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 	}
 
 	modeName := ""
-	if modeArg, ok := tag.NamedArg("mode"); ok {
+	if modeArg, ok := tag.NamedArg("discriminator"); ok {
 		modeName = modeArg.Value
 	}
 
@@ -206,16 +206,16 @@ func (mtv *memberTagValidator) Docs() TagDoc {
 		Tag:            mtv.TagName(),
 		StabilityLevel: Alpha,
 		Scopes:         mtv.ValidScopes().UnsortedList(),
-		Description:    "Indicates that this field's validation depends on a mode discriminator.",
+		Description:    "Indicates that this field's validation depends on a discriminator.",
 		Args: []TagArgDoc{{
 			Name:        "", // positional
 			Description: "<string>",
 			Docs:        "the value of the discriminator for which this validation applies",
 			Type:        codetags.ArgTypeString,
 		}, {
-			Name:        "mode",
+			Name:        "discriminator",
 			Description: "<string>",
-			Docs:        "the name of the mode group",
+			Docs:        "the name of the discriminator group",
 			Type:        codetags.ArgTypeString,
 		}, {
 			Name:        "value",
@@ -262,7 +262,7 @@ func (mtfv *modeTypeOrFieldValidator) GetValidations(context Context) (Validatio
 		group := groups[gn]
 		if group.discriminatorMember == nil {
 			if len(group.members) > 0 {
-				return Validations{}, fmt.Errorf("mode group %q in %s has members but no discriminator field (+k8s:mode)", gn, context.Path)
+				return Validations{}, fmt.Errorf("discriminator group %q in %s has members but no discriminator field (+%s)", gn, context.Path, discriminatorTagName)
 			}
 			continue
 		}
@@ -373,7 +373,7 @@ func (mtfv *modeTypeOrFieldValidator) generateModeFieldValidation(context Contex
 		},
 	}
 
-	fn := Function(modeTagName, DefaultFlags, modalValidator,
+	fn := Function(discriminatorTagName, DefaultFlags, modalValidator,
 		Literal(fmt.Sprintf("fldPath.Child(%q)", jsonName)),
 		Literal(fmt.Sprintf("%sobj.%s", exprPfx, rules.member.Name)),
 		oldValueExpr,
