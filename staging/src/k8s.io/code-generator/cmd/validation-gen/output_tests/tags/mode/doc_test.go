@@ -126,3 +126,29 @@ func TestMultipleDiscriminators(t *testing.T) {
 		field.Required(field.NewPath("s3Bucket"), ""),
 	})
 }
+
+func TestListTypeInsideMode(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Valid unique list
+	st.Value(&ListTypeInsideMode{
+		Mode: "A",
+		Items: []ListItem{
+			{Name: "one"},
+			{Name: "two"},
+		},
+	}).ExpectValid()
+
+	// Invalid duplicate list (globally enforced by listType=map)
+	// We expect exactly ONE Duplicate error. If the validation was generated twice
+	// (once globally, once inside mode A), we might see two errors here.
+	st.Value(&ListTypeInsideMode{
+		Mode: "A",
+		Items: []ListItem{
+			{Name: "one"},
+			{Name: "one"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("items").Index(1), ListItem{Name: "one"}),
+	})
+}

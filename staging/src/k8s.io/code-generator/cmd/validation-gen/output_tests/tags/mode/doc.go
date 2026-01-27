@@ -104,4 +104,25 @@ type MultipleDiscriminators struct {
 	S3Bucket *string `json:"s3Bucket,omitempty"`
 }
 
+type ListTypeInsideMode struct {
+	TypeMeta int
+
+	// +k8s:discriminator
+	Mode string `json:"mode"`
+
+	// listType is technically a static property, but if specified inside a mode,
+	// it should not trigger duplicate validations (one inside the mode, one global).
+	// Because listType implementation relies on global state, this effectively
+	// makes the list a map globally, but we verify here that we don't get
+	// a redundant validation inside the modal block.
+	//
+	// +k8s:member("A")=+k8s:listType=map
+	// +k8s:member("A")=+k8s:listMapKey=name
+	Items []ListItem `json:"items,omitempty"`
+}
+
+type ListItem struct {
+	Name string `json:"name"`
+}
+
 type TypeMeta int
