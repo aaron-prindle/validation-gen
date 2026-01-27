@@ -37,6 +37,7 @@ func init() {
 	RegisterTagValidator(&modeTagValidator{modeDefinitions})
 	RegisterTagValidator(&memberTagValidator{modeDefinitions, nil})
 	RegisterTypeValidator(&modeTypeOrFieldValidator{modeDefinitions})
+	RegisterFieldValidator(&modeTypeOrFieldValidator{modeDefinitions})
 }
 
 // modeDefinitions stores all mode definitions found by tag validators.
@@ -188,7 +189,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 		}
 	}
 
-	payloadValidations, err := mtv.validator.ExtractValidations(context, *tag.ValueTag)
+	payloadValidations, err := mtv.validator.ExtractTagValidations(context, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}
@@ -239,7 +240,7 @@ func (modeTypeOrFieldValidator) Name() string {
 }
 
 func (mtfv *modeTypeOrFieldValidator) GetValidations(context Context) (Validations, error) {
-	// We only care about structs for now.
+	// Extract the most concrete type possible.
 	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct {
 		return Validations{}, nil
 	}
