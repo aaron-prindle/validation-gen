@@ -59,6 +59,21 @@ type TagValidator interface {
 	Docs() TagDoc
 }
 
+// AccumulatorValidator is an optional extension to TagValidator. It describes
+// a "2-phase" tag that normally accumulates state globally in Phase 1, and relies
+// on a FieldValidator to emit code in Phase 2 (e.g., +k8s:listType=map).
+//
+// When these tags are used as payloads inside wrapper tags (like +k8s:member or +k8s:subfield),
+// the wrapper needs to extract the code immediately without polluting global state.
+// AccumulatorValidator defines how this tag emits its logic instantly for local scopes.
+type AccumulatorValidator interface {
+	TagValidator
+
+	// EmitImmediate returns the validation logic for this tag directly, bypassing
+	// any global state accumulation.
+	EmitImmediate(context Context, tag codetags.Tag) (Validations, error)
+}
+
 // LateTagValidator is an optional extension to TagValidator. Any TagValidator
 // which implements this interface will be evaluated after all TagValidators
 // which do not.
@@ -575,6 +590,14 @@ type VariableGen struct {
 type WrapperFunction struct {
 	Function FunctionGen
 	ObjType  *types.Type
+}
+
+// MultiWrapperFunction describes a function literal which has the fingerprint
+// of a regular validation function (op, fldPath, obj, oldObj) and calls
+// multiple other validation functions with the same signature.
+type MultiWrapperFunction struct {
+	Functions []FunctionGen
+	ObjType   *types.Type
 }
 
 // Literal is a literal value that, when used as an argument to a validator,

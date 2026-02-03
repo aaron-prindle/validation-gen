@@ -230,6 +230,63 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	return validations, nil
 }
 
+func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	return reg.extractTagValidationsInternal(context, false, tags...)
+}
+
+func (reg *registry) ExtractImmediateValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	return reg.extractTagValidationsInternal(context, true, tags...)
+}
+
+func (reg *registry) extractTagValidationsInternal(context Context, immediate bool, tags ...codetags.Tag) (Validations, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
+	validations := Validations{}
+	// Check all tags first for tag processing issues, including chained tags
+	errors := reg.checkTags(tags)
+	// If there are tag processing issues, report them all together
+	if len(errors) > 0 {
+		return Validations{}, fmt.Errorf("tag processing errors: %s", strings.Join(errors, "; "))
+	}
+	// Run tag-validators only.
+	phases := reg.sortTagsIntoPhases(tags)
+	for _, tags := range phases {
+		for _, tag := range tags {
+			tv := reg.tagValidators[tag.Name]
+			// At this point we know tv exists and is not nil due to the upfront check
+			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
+				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+			}
+			if err := typeCheck(tag, tv.Docs()); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			}
+			
+			var theseValidations Validations
+			var err error
+
+			// In "Immediate Mode", we force AccumulatorValidators to emit code directly.
+			// This is used for chained validations inside wrapper tags.
+			if immediate {
+				if acc, ok := tv.(AccumulatorValidator); ok {
+					theseValidations, err = acc.EmitImmediate(context, tag)
+				} else {
+					theseValidations, err = tv.GetValidations(context, tag)
+				}
+			} else {
+				theseValidations, err = tv.GetValidations(context, tag)
+			}
+
+			if err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			} else {
+				validations.Add(theseValidations)
+			}
+		}
+	}
+	return validations, nil
+}
+
 func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 	// First sort all tags by their name, so the final output is deterministic.
 	// It is important to do this before validations are generated.
@@ -318,6 +375,18 @@ type Validator interface {
 	// or more validations, which will later be rendered by the code-generation
 	// logic.
 	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractTagValidations considers the given context and evaluates
+	// registered tag-validators only. This is useful for meta-validators which
+	// want to extract validations for a payload tag without triggering the
+	// full validation lifecycle.
+	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractImmediateValidations considers the given context and evaluates
+	// registered tag-validators in "Immediate Mode". This forces 2-phase Accumulator
+	// tags (like listType) to emit their validation code immediately rather than
+	// deferring to global state. This is used by wrapper tags like +k8s:member and +k8s:subfield.
+	ExtractImmediateValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc

@@ -129,10 +129,9 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := util.NativeType(context.Type)
-	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
+	_, err := lttv.validateInputs(context, tag)
+	if err != nil {
+		return Validations{}, err
 	}
 
 	lm := lttv.byPath[context.Path.String()]
@@ -166,9 +165,6 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		if lm.semantic != "" && lm.semantic != semanticAtomic {
 			return Validations{}, fmt.Errorf("unique tag is redundant for listType=%q", tag.Value)
 		}
-		if util.NativeType(t.Elem).Kind != types.Struct {
-			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
-		}
 		lm.semantic = semanticMap
 	default:
 		return Validations{}, fmt.Errorf("unknown list type %q", tag.Value)
@@ -177,6 +173,46 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
 	return Validations{}, nil
+}
+
+// EmitImmediate implements the AccumulatorValidator interface for wrapper compatibility.
+func (lttv listTypeTagValidator) EmitImmediate(context Context, tag codetags.Tag) (Validations, error) {
+	t, err := lttv.validateInputs(context, tag)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	if tag.Value == "set" {
+		// Immediate Mode: emit uniqueness check for the entire element.
+		matchFn := FunctionLiteral{
+			Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+			Results:    []ParamResult{{"", types.Bool}},
+		}
+
+		if util.IsNilableType(t.Elem) {
+			matchFn.Body = "if a == nil || b == nil { return a == b }; return *a == *b"
+		} else {
+			matchFn.Body = "return a == b"
+		}
+
+		fn := Function(listTypeTagName, DefaultFlags, types.Name{Package: libValidationPkg, Name: "Unique"}, matchFn)
+		return Validations{Functions: []FunctionGen{fn}}, nil
+	}
+	// If it's "map", listMapKey handles the code generation.
+	// If it's "atomic", no code is generated anyway.
+	return Validations{}, nil
+}
+
+func (lttv listTypeTagValidator) validateInputs(context Context, tag codetags.Tag) (*types.Type, error) {
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Slice && t.Kind != types.Array {
+		return nil, fmt.Errorf("can only be used on list types (%s)", t.Kind)
+	}
+	if tag.Value == "map" && util.NativeType(t.Elem).Kind != types.Struct {
+		return nil, fmt.Errorf("only lists of structs can be list-maps")
+	}
+	return t, nil
 }
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
@@ -210,28 +246,9 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := util.NativeType(context.Type)
-	if t.Kind != types.Slice && t.Kind != types.Array {
-		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
-	}
-	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-	if util.NativeType(t.Elem).Kind != types.Struct {
-		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
-	}
-
-	var memb *types.Member
-	if m := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); m == nil {
-		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
-	} else {
-		keyType := m.Type
-		if keyType.Kind == types.Pointer {
-			keyType = keyType.Elem
-		}
-		if util.NativeType(keyType).Kind != types.Builtin {
-			return Validations{}, fmt.Errorf("only primitive types and pointers to primitive types can be list-map keys, not %s", m.Type.String())
-		}
-		memb = m
+	_, memb, err := lmktv.validateInputs(context, tag)
+	if err != nil {
+		return Validations{}, err
 	}
 
 	lm := lmktv.byPath[context.Path.String()]
@@ -245,6 +262,58 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
 	return Validations{}, nil
+}
+
+// EmitImmediate implements the AccumulatorValidator interface for wrapper compatibility.
+func (lmktv listMapKeyTagValidator) EmitImmediate(context Context, tag codetags.Tag) (Validations, error) {
+	t, memb, err := lmktv.validateInputs(context, tag)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	// Immediate Mode: emit the uniqueness check directly.
+	keyAccessor := FunctionLiteral{
+		Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+		Results:    []ParamResult{{"", types.Bool}},
+	}
+
+	if util.IsNilableType(memb.Type) {
+		// If the field is a pointer, compare by dereferencing
+		keyAccessor.Body = fmt.Sprintf("if a.%s == nil || b.%s == nil { return a.%s == b.%s }; return *a.%s == *b.%s", memb.Name, memb.Name, memb.Name, memb.Name, memb.Name, memb.Name)
+	} else {
+		keyAccessor.Body = fmt.Sprintf("return a.%s == b.%s", memb.Name, memb.Name)
+	}
+
+	fn := Function(ListMapKeyTagName, DefaultFlags, types.Name{Package: libValidationPkg, Name: "Unique"}, keyAccessor)
+	return Validations{Functions: []FunctionGen{fn}}, nil
+}
+
+func (lmktv listMapKeyTagValidator) validateInputs(context Context, tag codetags.Tag) (*types.Type, *types.Member, error) {
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Slice && t.Kind != types.Array {
+		return nil, nil, fmt.Errorf("can only be used on list types (%s)", t.Kind)
+	}
+	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
+	if util.NativeType(t.Elem).Kind != types.Struct {
+		return nil, nil, fmt.Errorf("only lists of structs can be list-maps")
+	}
+
+	var memb *types.Member
+	if m := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); m == nil {
+		return nil, nil, fmt.Errorf("no field for JSON name %q", tag.Value)
+	} else {
+		keyType := m.Type
+		if keyType.Kind == types.Pointer {
+			keyType = keyType.Elem
+		}
+		if util.NativeType(keyType).Kind != types.Builtin {
+			return nil, nil, fmt.Errorf("only primitive types and pointers to primitive types can be list-map keys, not %s", m.Type.String())
+		}
+		memb = m
+	}
+
+	return t, memb, nil
 }
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {

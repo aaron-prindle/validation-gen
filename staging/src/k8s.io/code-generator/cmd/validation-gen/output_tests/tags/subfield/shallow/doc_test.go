@@ -19,6 +19,7 @@ package shallow
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/ptr"
 )
 
@@ -50,6 +51,36 @@ func Test(t *testing.T) {
 		"structPtrField.pointerField": {"subfield Struct.StructPtrField.PointerField"},
 		"structPtrField.structField":  {"subfield Struct.StructPtrField.StructField"},
 		"structPtrField.sliceField":   {"subfield Struct.StructPtrField.SliceField"},
-		"structPtrField.mapField":     {"subfield Struct.StructPtrField.MapField"},
-	})
-}
+				"structPtrField.mapField":    {"subfield Struct.StructPtrField.MapField"},
+			})
+		}
+		
+		func TestListInsideSubfield(t *testing.T) {
+			st := localSchemeBuilder.Test(t)
+		
+			// Valid unique maps and sets
+			st.Value(&ListInsideSubfield{
+				Lists: ListStruct{
+					ListTypeMap: []ListItem{{Name: "a", Val: "1"}, {Name: "b", Val: "2"}},
+					ListTypeSet: []string{"a", "b"},
+				},
+			}).ExpectValid()
+		
+			// Duplicate map keys inside subfield
+			st.Value(&ListInsideSubfield{
+				Lists: ListStruct{
+					ListTypeMap: []ListItem{{Name: "dup", Val: "1"}, {Name: "dup", Val: "2"}},
+				},
+			}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+						field.Duplicate(field.NewPath("lists").Child("listTypeMap").Index(1), ListItem{Name: "dup", Val: "2"}),
+					})		
+			// Duplicate set values inside subfield
+			st.Value(&ListInsideSubfield{
+				Lists: ListStruct{
+					ListTypeSet: []string{"dup", "dup"},
+				},
+			}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+				field.Duplicate(field.NewPath("lists").Child("listTypeSet").Index(1), "dup"),
+			})
+		}
+		

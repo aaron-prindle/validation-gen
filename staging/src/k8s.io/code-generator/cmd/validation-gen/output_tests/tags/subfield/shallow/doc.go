@@ -56,3 +56,22 @@ type OtherStruct struct {
 type SmallStruct struct {
 	StringField string `json:"stringField"`
 }
+
+type ListItem struct {
+	Name string `json:"name"`
+	Val  string `json:"val"`
+}
+
+// +k8s:subfield(listTypeMap)=+k8s:listType=map
+// +k8s:subfield(listTypeMap)=+k8s:listMapKey=name
+// +k8s:subfield(listTypeSet)=+k8s:listType=set
+type ListStruct struct {
+	ListTypeMap []ListItem `json:"listTypeMap"`
+	ListTypeSet []string   `json:"listTypeSet"`
+}
+
+type ListInsideSubfield struct {
+	TypeMeta int `json:"typeMeta"`
+
+	Lists ListStruct `json:"lists"`
+}
