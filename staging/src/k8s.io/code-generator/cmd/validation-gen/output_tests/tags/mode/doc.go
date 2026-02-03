@@ -121,6 +121,16 @@ type ListTypeInsideMode struct {
 	Items []ListItem `json:"items,omitempty"`
 }
 
+type ListTypeSetInsideMode struct {
+	TypeMeta int
+
+	// +k8s:discriminator
+	Mode string `json:"mode"`
+
+	// +k8s:member("A")=+k8s:listType=set
+	Items []string `json:"items,omitempty"`
+}
+
 type ListItem struct {
 	Name string `json:"name"`
 }

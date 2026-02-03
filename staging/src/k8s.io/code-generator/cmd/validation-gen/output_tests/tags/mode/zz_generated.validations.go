@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -59,6 +58,14 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		switch op.Request.SubresourcePath() {
 		case "/":
 			return Validate_ListTypeInsideMode(ctx, op, nil /* fldPath */, obj.(*ListTypeInsideMode), safe.Cast[*ListTypeInsideMode](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ListTypeSetInsideMode
+	scheme.AddValidationFunc((*ListTypeSetInsideMode)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ListTypeSetInsideMode(ctx, op, nil /* fldPath */, obj.(*ListTypeSetInsideMode), safe.Cast[*ListTypeSetInsideMode](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
@@ -186,6 +193,7 @@ func Validate_ListTypeInsideMode(ctx context.Context, op operation.Operation, fl
 			Value: "A",
 			Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
 				errs := field.ErrorList{}
+				errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ListItem, b ListItem) bool { return a.Name == b.Name })...)
 				return errs
 			},
 		},
@@ -193,20 +201,36 @@ func Validate_ListTypeInsideMode(ctx context.Context, op operation.Operation, fl
 
 	// field ListTypeInsideMode.TypeMeta has no validation
 	// field ListTypeInsideMode.Mode has no validation
+	// field ListTypeInsideMode.Items has no validation
+	return errs
+}
 
-	// field ListTypeInsideMode.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []ListItem, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ListItem, b ListItem) bool { return a.Name == b.Name })...)
-			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *ListTypeInsideMode) []ListItem { return oldObj.Items }), oldObj != nil)...)
+// Validate_ListTypeSetInsideMode validates an instance of ListTypeSetInsideMode according
+// to declarative validation rules in the API schema.
+func Validate_ListTypeSetInsideMode(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListTypeSetInsideMode) (errs field.ErrorList) {
+	errs = append(errs, validate.Modal(ctx, op, fldPath, obj, oldObj, fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *ListTypeSetInsideMode) []string {
+		if oldObj == nil {
+			return nil
+		}
+		return oldObj.Items
+	}), obj.Mode, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+		errs := field.ErrorList{}
+		errs = append(errs, validate.ForbiddenSlice[string](ctx, op, fldPath, obj, oldObj)...)
+		return errs
+	}, []validate.ModalRule[[]string]{
+		{
+			Value: "A",
+			Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+				errs := field.ErrorList{}
+				errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a string, b string) bool { return a == b })...)
+				return errs
+			},
+		},
+	})...)
 
+	// field ListTypeSetInsideMode.TypeMeta has no validation
+	// field ListTypeSetInsideMode.Mode has no validation
+	// field ListTypeSetInsideMode.Items has no validation
 	return errs
 }
 

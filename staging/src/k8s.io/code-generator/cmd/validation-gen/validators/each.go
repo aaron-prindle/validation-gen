@@ -104,7 +104,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
 	}
-	if validations, err := evtv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+	if validations, err := evtv.validator.ExtractImmediateValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if validations.Empty() && !validations.OpaqueKeyType && !validations.OpaqueValType && !validations.OpaqueType {
@@ -275,7 +275,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		ParentPath: context.Path,
 	}
 
-	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
+	if validations, err := ektv.validator.ExtractImmediateValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {

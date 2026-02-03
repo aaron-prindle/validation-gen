@@ -38,6 +38,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type ListInsideSubfield
+	scheme.AddValidationFunc((*ListInsideSubfield)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ListInsideSubfield(ctx, op, nil /* fldPath */, obj.(*ListInsideSubfield), safe.Cast[*ListInsideSubfield](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -47,6 +55,45 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_ListInsideSubfield validates an instance of ListInsideSubfield according
+// to declarative validation rules in the API schema.
+func Validate_ListInsideSubfield(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListInsideSubfield) (errs field.ErrorList) {
+	// field ListInsideSubfield.TypeMeta has no validation
+
+	// field ListInsideSubfield.Lists
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ListStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ListStruct(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("lists"), &obj.Lists, safe.Field(oldObj, func(oldObj *ListInsideSubfield) *ListStruct { return &oldObj.Lists }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ListStruct validates an instance of ListStruct according
+// to declarative validation rules in the API schema.
+func Validate_ListStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListStruct) (errs field.ErrorList) {
+	func() { // cohort listTypeMap
+		errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "listTypeMap", func(o *ListStruct) []ListItem { return o.ListTypeMap }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []ListItem) field.ErrorList {
+			return validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ListItem, b ListItem) bool { return a.Name == b.Name })
+		})...)
+	}()
+	func() { // cohort listTypeSet
+		errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "listTypeSet", func(o *ListStruct) []string { return o.ListTypeSet }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+			return validate.Unique(ctx, op, fldPath, obj, oldObj, func(a string, b string) bool { return a == b })
+		})...)
+	}()
+
+	// field ListStruct.ListTypeMap has no validation
+	// field ListStruct.ListTypeSet has no validation
+	return errs
 }
 
 // Validate_Struct validates an instance of Struct according

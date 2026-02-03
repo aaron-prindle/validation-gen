@@ -231,6 +231,14 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 }
 
 func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	return reg.extractTagValidationsInternal(context, false, tags...)
+}
+
+func (reg *registry) ExtractImmediateValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	return reg.extractTagValidationsInternal(context, true, tags...)
+}
+
+func (reg *registry) extractTagValidationsInternal(context Context, immediate bool, tags ...codetags.Tag) (Validations, error) {
 	if !reg.initialized.Load() {
 		panic("registry.init() was not called")
 	}
@@ -253,7 +261,23 @@ func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag
 			if err := typeCheck(tag, tv.Docs()); err != nil {
 				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
 			}
-			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
+			
+			var theseValidations Validations
+			var err error
+
+			// In "Immediate Mode", we force AccumulatorValidators to emit code directly.
+			// This is used for chained validations inside wrapper tags.
+			if immediate {
+				if acc, ok := tv.(AccumulatorValidator); ok {
+					theseValidations, err = acc.EmitImmediate(context, tag)
+				} else {
+					theseValidations, err = tv.GetValidations(context, tag)
+				}
+			} else {
+				theseValidations, err = tv.GetValidations(context, tag)
+			}
+
+			if err != nil {
 				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
 			} else {
 				validations.Add(theseValidations)
@@ -357,6 +381,12 @@ type Validator interface {
 	// want to extract validations for a payload tag without triggering the
 	// full validation lifecycle.
 	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractImmediateValidations considers the given context and evaluates
+	// registered tag-validators in "Immediate Mode". This forces 2-phase Accumulator
+	// tags (like listType) to emit their validation code immediately rather than
+	// deferring to global state. This is used by wrapper tags like +k8s:member and +k8s:subfield.
+	ExtractImmediateValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc

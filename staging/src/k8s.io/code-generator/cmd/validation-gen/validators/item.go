@@ -160,7 +160,7 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		ParentPath:   context.Path,
 	}
 
-	validations, err := itv.validator.ExtractValidations(subContext, *tag.ValueTag)
+	validations, err := itv.validator.ExtractImmediateValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}

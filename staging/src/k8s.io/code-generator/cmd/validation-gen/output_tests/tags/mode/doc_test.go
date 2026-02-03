@@ -127,6 +127,7 @@ func TestMultipleDiscriminators(t *testing.T) {
 	})
 }
 
+
 func TestListTypeInsideMode(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
@@ -150,5 +151,25 @@ func TestListTypeInsideMode(t *testing.T) {
 		},
 	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Duplicate(field.NewPath("items").Index(1), ListItem{Name: "one"}),
+	})
+}
+
+func TestListTypeSetInsideMode(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Mode A: listType=set applies.
+	st.Value(&ListTypeSetInsideMode{
+		Mode:  "A",
+		Items: []string{"duplicate", "duplicate"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Duplicate(field.NewPath("items[1]"), "duplicate"),
+	})
+
+	// Mode B: items implicitly forbidden.
+	st.Value(&ListTypeSetInsideMode{
+		Mode:  "B",
+		Items: []string{"foo"},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Forbidden(field.NewPath("items"), ""),
 	})
 }

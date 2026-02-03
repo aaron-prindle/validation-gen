@@ -179,6 +179,30 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	return Validations{}, nil
 }
 
+// EmitImmediate implements the AccumulatorValidator interface for wrapper compatibility.
+func (lttv listTypeTagValidator) EmitImmediate(context Context, tag codetags.Tag) (Validations, error) {
+	t := util.NativeType(context.Type)
+	if tag.Value == "set" {
+		// Immediate Mode: emit uniqueness check for the entire element.
+		matchFn := FunctionLiteral{
+			Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+			Results:    []ParamResult{{"", types.Bool}},
+		}
+
+		if util.IsNilableType(t.Elem) {
+			matchFn.Body = "if a == nil || b == nil { return a == b }; return *a == *b"
+		} else {
+			matchFn.Body = "return a == b"
+		}
+
+		fn := Function(listTypeTagName, DefaultFlags, types.Name{Package: libValidationPkg, Name: "Unique"}, matchFn)
+		return Validations{Functions: []FunctionGen{fn}}, nil
+	}
+	// If it's "map", listMapKey handles the code generation.
+	// If it's "atomic", no code is generated anyway.
+	return Validations{}, nil
+}
+
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lttv.TagName(),
@@ -245,6 +269,33 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
 	return Validations{}, nil
+}
+
+// EmitImmediate implements the AccumulatorValidator interface for wrapper compatibility.
+func (lmktv listMapKeyTagValidator) EmitImmediate(context Context, tag codetags.Tag) (Validations, error) {
+	t := util.NativeType(context.Type)
+	var memb *types.Member
+	if m := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); m != nil {
+		memb = m
+	} else {
+		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
+	}
+
+	// Immediate Mode: emit the uniqueness check directly.
+	keyAccessor := FunctionLiteral{
+		Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+		Results:    []ParamResult{{"", types.Bool}},
+	}
+
+	if util.IsNilableType(memb.Type) {
+		// If the field is a pointer, compare by dereferencing
+		keyAccessor.Body = fmt.Sprintf("if a.%s == nil || b.%s == nil { return a.%s == b.%s }; return *a.%s == *b.%s", memb.Name, memb.Name, memb.Name, memb.Name, memb.Name, memb.Name)
+	} else {
+		keyAccessor.Body = fmt.Sprintf("return a.%s == b.%s", memb.Name, memb.Name)
+	}
+
+	fn := Function(ListMapKeyTagName, DefaultFlags, types.Name{Package: libValidationPkg, Name: "Unique"}, keyAccessor)
+	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {

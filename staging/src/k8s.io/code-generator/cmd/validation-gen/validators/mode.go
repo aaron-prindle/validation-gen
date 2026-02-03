@@ -189,7 +189,7 @@ func (mtv *memberTagValidator) GetValidations(context Context, tag codetags.Tag)
 		}
 	}
 
-	payloadValidations, err := mtv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	payloadValidations, err := mtv.validator.ExtractImmediateValidations(context, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}

@@ -77,7 +77,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 		Member:     submemb,
 		ParentPath: context.Path,
 	}
-	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
+	if validations, err := stv.validator.ExtractImmediateValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {
