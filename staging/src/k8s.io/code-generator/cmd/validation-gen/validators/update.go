@@ -68,11 +68,11 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 
 	if context.Sandbox != nil {
 		// Sandbox Mode
-		if val, exists := context.Sandbox.Get(updateConstraintKey{}); exists {
-			constraintSet = val.(sets.Set[validate.UpdateConstraint])
+		if val, exists := GetFromSandbox[sets.Set[validate.UpdateConstraint]](context.Sandbox, updateConstraintKey{}); exists {
+			constraintSet = val
 		} else {
 			constraintSet = sets.New[validate.UpdateConstraint]()
-			context.Sandbox.Set(updateConstraintKey{}, constraintSet)
+			SetInSandbox(context.Sandbox, updateConstraintKey{}, constraintSet)
 		}
 	} else {
 		// Global Mode
@@ -188,8 +188,8 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 
 	if context.Sandbox != nil {
 		// Sandbox Mode
-		if val, exists := context.Sandbox.Get(updateConstraintKey{}); exists {
-			constraintSet = val.(sets.Set[validate.UpdateConstraint])
+		if val, exists := GetFromSandbox[sets.Set[validate.UpdateConstraint]](context.Sandbox, updateConstraintKey{}); exists {
+			constraintSet = val
 			ok = true
 		}
 	} else {

@@ -260,17 +260,23 @@ func NewSandbox() *Sandbox {
 	}
 }
 
-// Get retrieves a value from the sandbox.
-func (s *Sandbox) Get(key any) (any, bool) {
+// GetFromSandbox retrieves a strongly-typed value from the sandbox.
+// T is the expected type of the stored value.
+func GetFromSandbox[T any](s *Sandbox, key any) (T, bool) {
 	if s == nil || s.store == nil {
-		return nil, false
+		var zero T
+		return zero, false
 	}
 	val, exists := s.store[key]
-	return val, exists
+	if !exists {
+		var zero T
+		return zero, false
+	}
+	return val.(T), true
 }
 
-// Set stores a value in the sandbox.
-func (s *Sandbox) Set(key any, val any) {
+// SetInSandbox stores a strongly-typed value in the sandbox.
+func SetInSandbox[T any](s *Sandbox, key any, val T) {
 	if s.store == nil {
 		s.store = make(map[any]any)
 	}
