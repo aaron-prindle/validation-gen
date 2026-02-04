@@ -59,6 +59,15 @@ type TagValidator interface {
 	Docs() TagDoc
 }
 
+// GroupedTagValidator is an optional interface for wrapper tags that need to process
+// multiple instances of the same tag (e.g., +k8s:subfield) together in a single batch.
+// This allows wrapper tags to build a unified Sandbox Context for all their payloads
+// before extracting validations, enabling isolated 2-phase tag aggregation.
+type GroupedTagValidator interface {
+	TagValidator
+	GetGroupedValidations(context Context, tags []codetags.Tag) (Validations, error)
+}
+
 // LateTagValidator is an optional extension to TagValidator. Any TagValidator
 // which implements this interface will be evaluated after all TagValidators
 // which do not.
@@ -230,6 +239,11 @@ type Context struct {
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
+
+	// Sandbox provides an isolated namespace for stateful tags (like listType or update)
+	// to accumulate data when they are executed inside a conditional wrapper block
+	// (like +k8s:subfield or +k8s:member). It prevents global state pollution.
+	Sandbox map[string]any
 }
 
 // Constant represents a constant value.

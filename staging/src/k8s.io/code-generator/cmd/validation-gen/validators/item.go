@@ -158,9 +158,10 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		Path:         itemPath,
 		ListSelector: itemSelector,
 		ParentPath:   context.Path,
+		Sandbox:      make(map[string]any),
 	}
 
-	validations, err := itv.validator.ExtractValidations(subContext, *tag.ValueTag)
+	validations, err := itv.validator.ExtractSandboxValidations(subContext, *tag.ValueTag)
 	if err != nil {
 		return Validations{}, err
 	}

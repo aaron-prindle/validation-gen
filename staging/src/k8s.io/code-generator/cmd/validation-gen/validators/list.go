@@ -135,10 +135,18 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := lttv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		lttv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if context.Sandbox["listMetadata"] == nil {
+			context.Sandbox["listMetadata"] = &listMetadata{}
+		}
+		lm = context.Sandbox["listMetadata"].(*listMetadata)
+	} else {
+		lm = lttv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			lttv.byPath[context.Path.String()] = lm
+		}
 	}
 	if lm.ownership != "" {
 		return Validations{}, fmt.Errorf("listType cannot be specified more than once")
@@ -178,6 +186,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 	// information for other tags to use.
 	return Validations{}, nil
 }
+
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
@@ -234,10 +243,18 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 		memb = m
 	}
 
-	lm := lmktv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		lmktv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if context.Sandbox["listMetadata"] == nil {
+			context.Sandbox["listMetadata"] = &listMetadata{}
+		}
+		lm = context.Sandbox["listMetadata"].(*listMetadata)
+	} else {
+		lm = lmktv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			lmktv.byPath[context.Path.String()] = lm
+		}
 	}
 	lm.keyMembers = append(lm.keyMembers, memb)
 	lm.keyNames = append(lm.keyNames, tag.Value)
@@ -246,6 +263,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	// information for other tags to use.
 	return Validations{}, nil
 }
+
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
@@ -284,10 +302,18 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := utv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		utv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if context.Sandbox["listMetadata"] == nil {
+			context.Sandbox["listMetadata"] = &listMetadata{}
+		}
+		lm = context.Sandbox["listMetadata"].(*listMetadata)
+	} else {
+		lm = utv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			utv.byPath[context.Path.String()] = lm
+		}
 	}
 
 	// If listType has already run and set a non-atomic ownership, this is an error.
@@ -353,10 +379,18 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := cutv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		cutv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if context.Sandbox["listMetadata"] == nil {
+			context.Sandbox["listMetadata"] = &listMetadata{}
+		}
+		lm = context.Sandbox["listMetadata"].(*listMetadata)
+	} else {
+		lm = cutv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			cutv.byPath[context.Path.String()] = lm
+		}
 	}
 
 	lm.customUnique = true
@@ -400,7 +434,14 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	}
 
 	// Look up the list metadata which is defined on this field or type.
-	lm := lv.byPath[context.Path.String()]
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := context.Sandbox["listMetadata"]; exists {
+			lm = val.(*listMetadata)
+		}
+	} else {
+		lm = lv.byPath[context.Path.String()]
+	}
 
 	// NOTE: We don't really support list-of-list or map-of-list, so this does
 	// not consider the case of ScopeListVal or ScopeMapVal. If we want to
