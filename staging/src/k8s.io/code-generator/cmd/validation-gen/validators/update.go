@@ -37,6 +37,9 @@ func init() {
 	RegisterTagValidator(updateTagCollector{byFieldPath: shared})
 }
 
+// updateConstraintKey is used as a typed, collision-free key for the Sandbox.
+type updateConstraintKey struct{}
+
 // updateTagCollector collects +k8s:update tags
 type updateTagCollector struct {
 	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
@@ -55,34 +58,50 @@ func (updateTagCollector) ValidScopes() sets.Set[Scope] {
 }
 
 func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
-	// Parse constraint from this tag
-	var constraint validate.UpdateConstraint
-	switch tag.Value {
-	case "NoSet":
-		constraint = validate.NoSet
-	case "NoUnset":
-		constraint = validate.NoUnset
-	case "NoModify":
-		constraint = validate.NoModify
-	default:
-		return Validations{}, fmt.Errorf("unknown +k8s:update constraint: %s", tag.Value)
-	}
-
-	// Initialize set if doesn't exist
-	fieldPath := context.Path.String()
-	if utc.byFieldPath[fieldPath] == nil {
-		utc.byFieldPath[fieldPath] = sets.New[validate.UpdateConstraint]()
-	}
-
-	// Add this constraint to the set for this field
-	utc.byFieldPath[fieldPath].Insert(constraint)
-
-	if err := utc.validateConstraintsForType(context, utc.byFieldPath[fieldPath].UnsortedList()); err != nil {
+	constraint, err := parseConstraint(tag.Value)
+	if err != nil {
 		return Validations{}, err
 	}
 
-	// Don't generate validations here, just collect
+	fieldPath := context.Path.String()
+	var constraintSet sets.Set[validate.UpdateConstraint]
+
+	if context.Sandbox != nil {
+		// Sandbox Mode
+		if val, exists := GetFromSandbox[sets.Set[validate.UpdateConstraint]](context.Sandbox, updateConstraintKey{}); exists {
+			constraintSet = val
+		} else {
+			constraintSet = sets.New[validate.UpdateConstraint]()
+			SetInSandbox(context.Sandbox, updateConstraintKey{}, constraintSet)
+		}
+	} else {
+		// Global Mode
+		if utc.byFieldPath[fieldPath] == nil {
+			utc.byFieldPath[fieldPath] = sets.New[validate.UpdateConstraint]()
+		}
+		constraintSet = utc.byFieldPath[fieldPath]
+	}
+
+	constraintSet.Insert(constraint)
+
+	if err := utc.validateConstraintsForType(context, constraintSet.UnsortedList()); err != nil {
+		return Validations{}, err
+	}
+
 	return Validations{}, nil
+}
+
+func parseConstraint(tagValue string) (validate.UpdateConstraint, error) {
+	switch tagValue {
+	case "NoSet":
+		return validate.NoSet, nil
+	case "NoUnset":
+		return validate.NoUnset, nil
+	case "NoModify":
+		return validate.NoModify, nil
+	default:
+		return 0, fmt.Errorf("unknown +k8s:update constraint: %s", tagValue)
+	}
 }
 
 func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
@@ -164,7 +183,20 @@ var (
 )
 
 func (ufv updateFieldValidator) GetValidations(context Context) (Validations, error) {
-	constraintSet, ok := ufv.byFieldPath[context.Path.String()]
+	var constraintSet sets.Set[validate.UpdateConstraint]
+	var ok bool
+
+	if context.Sandbox != nil {
+		// Sandbox Mode
+		if val, exists := GetFromSandbox[sets.Set[validate.UpdateConstraint]](context.Sandbox, updateConstraintKey{}); exists {
+			constraintSet = val
+			ok = true
+		}
+	} else {
+		// Global Mode
+		constraintSet, ok = ufv.byFieldPath[context.Path.String()]
+	}
+
 	if !ok || constraintSet.Len() == 0 {
 		return Validations{}, nil
 	}

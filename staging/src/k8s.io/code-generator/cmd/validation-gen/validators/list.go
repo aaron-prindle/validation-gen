@@ -66,6 +66,9 @@ const (
 	semanticMap    listSemantic = "map"    // uniqueness check based on key(s)
 )
 
+// listMetadataKey is used as a typed, collision-free key for the Sandbox.
+type listMetadataKey struct{}
+
 // listMetadata collects information about a single list with map or set semantics.
 type listMetadata struct {
 	ownership  listOwnership // For now we don't use it for generation.
@@ -135,10 +138,20 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := lttv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		lttv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := GetFromSandbox[*listMetadata](context.Sandbox, listMetadataKey{}); exists {
+			lm = val
+		} else {
+			lm = &listMetadata{}
+			SetInSandbox(context.Sandbox, listMetadataKey{}, lm)
+		}
+	} else {
+		lm = lttv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			lttv.byPath[context.Path.String()] = lm
+		}
 	}
 	if lm.ownership != "" {
 		return Validations{}, fmt.Errorf("listType cannot be specified more than once")
@@ -234,10 +247,20 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 		memb = m
 	}
 
-	lm := lmktv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		lmktv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := GetFromSandbox[*listMetadata](context.Sandbox, listMetadataKey{}); exists {
+			lm = val
+		} else {
+			lm = &listMetadata{}
+			SetInSandbox(context.Sandbox, listMetadataKey{}, lm)
+		}
+	} else {
+		lm = lmktv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			lmktv.byPath[context.Path.String()] = lm
+		}
 	}
 	lm.keyMembers = append(lm.keyMembers, memb)
 	lm.keyNames = append(lm.keyNames, tag.Value)
@@ -284,10 +307,20 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := utv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		utv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := GetFromSandbox[*listMetadata](context.Sandbox, listMetadataKey{}); exists {
+			lm = val
+		} else {
+			lm = &listMetadata{}
+			SetInSandbox(context.Sandbox, listMetadataKey{}, lm)
+		}
+	} else {
+		lm = utv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			utv.byPath[context.Path.String()] = lm
+		}
 	}
 
 	// If listType has already run and set a non-atomic ownership, this is an error.
@@ -353,10 +386,20 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", t.Kind)
 	}
 
-	lm := cutv.byPath[context.Path.String()]
-	if lm == nil {
-		lm = &listMetadata{}
-		cutv.byPath[context.Path.String()] = lm
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := GetFromSandbox[*listMetadata](context.Sandbox, listMetadataKey{}); exists {
+			lm = val
+		} else {
+			lm = &listMetadata{}
+			SetInSandbox(context.Sandbox, listMetadataKey{}, lm)
+		}
+	} else {
+		lm = cutv.byPath[context.Path.String()]
+		if lm == nil {
+			lm = &listMetadata{}
+			cutv.byPath[context.Path.String()] = lm
+		}
 	}
 
 	lm.customUnique = true
@@ -400,7 +443,14 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	}
 
 	// Look up the list metadata which is defined on this field or type.
-	lm := lv.byPath[context.Path.String()]
+	var lm *listMetadata
+	if context.Sandbox != nil {
+		if val, exists := GetFromSandbox[*listMetadata](context.Sandbox, listMetadataKey{}); exists {
+			lm = val
+		}
+	} else {
+		lm = lv.byPath[context.Path.String()]
+	}
 
 	// NOTE: We don't really support list-of-list or map-of-list, so this does
 	// not consider the case of ScopeListVal or ScopeMapVal. If we want to

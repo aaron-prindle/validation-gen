@@ -184,24 +184,11 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	}
 
 	// Run tag-validators first.
-	phases := reg.sortTagsIntoPhases(tags)
-	for _, tags := range phases {
-		for _, tag := range tags {
-			tv := reg.tagValidators[tag.Name]
-			// At this point we know tv exists and is not nil due to the upfront check
-			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
-				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
-			}
-			if err := typeCheck(tag, tv.Docs()); err != nil {
-				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-			}
-			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
-				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-			} else {
-				validations.Add(theseValidations)
-			}
-		}
+	tagValidations, err := reg.extractTagValidationsInternal(context, tags...)
+	if err != nil {
+		return Validations{}, err
 	}
+	validations.Add(tagValidations)
 
 	// Run type-validators after tag validators are done.
 	if context.Scope == ScopeType {
@@ -227,6 +214,109 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 		}
 	}
 
+	return validations, nil
+}
+
+func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	return reg.extractTagValidationsInternal(context, tags...)
+}
+
+func (reg *registry) ExtractSandboxValidations(context Context, tags ...codetags.Tag) (Validations, error) {
+	if context.Sandbox == nil {
+		return Validations{}, fmt.Errorf("ExtractSandboxValidations requires a Context with an initialized Sandbox")
+	}
+
+	validations := Validations{}
+
+	// 1. Run Tag Validators
+	tagValidations, err := reg.extractTagValidationsInternal(context, tags...)
+	if err != nil {
+		return Validations{}, err
+	}
+	validations.Add(tagValidations)
+
+	// 2. Run Field Validators against the sandbox
+	if context.Scope == ScopeField {
+		for _, fv := range reg.fieldValidators {
+			theseValidations, err := fv.GetValidations(context)
+			if err != nil {
+				return Validations{}, fmt.Errorf("sandbox field validator %q: %w", fv.Name(), err)
+			}
+			validations.Add(theseValidations)
+		}
+	}
+
+	return validations, nil
+}
+
+func (reg *registry) extractTagValidationsInternal(context Context, tags ...codetags.Tag) (Validations, error) {
+	if !reg.initialized.Load() {
+		panic("registry.init() was not called")
+	}
+	validations := Validations{}
+	// Check all tags first for tag processing issues, including chained tags
+	errors := reg.checkTags(tags)
+	// If there are tag processing issues, report them all together
+	if len(errors) > 0 {
+		return Validations{}, fmt.Errorf("tag processing errors: %s", strings.Join(errors, "; "))
+	}
+	// Run tag-validators only.
+	phases := reg.sortTagsIntoPhases(tags)
+	for _, phaseTags := range phases {
+		var currentGroupName string
+		var currentGroup []codetags.Tag
+
+		processGroup := func() error {
+			if len(currentGroup) == 0 {
+				return nil
+			}
+			tv := reg.tagValidators[currentGroupName]
+
+			// Validate scope and docs for all tags in the group
+			for _, tag := range currentGroup {
+				if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
+					return fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+				}
+				if err := typeCheck(tag, tv.Docs()); err != nil {
+					return fmt.Errorf("tag %q: %w", tv.TagName(), err)
+				}
+			}
+
+			// If it's a GroupedTagValidator, pass the whole group
+			if gv, ok := tv.(GroupedTagValidator); ok {
+				theseValidations, err := gv.GetGroupedValidations(context, currentGroup)
+				if err != nil {
+					return fmt.Errorf("tag %q: %w", tv.TagName(), err)
+				}
+				validations.Add(theseValidations)
+			} else {
+				// Otherwise process individually
+				for _, tag := range currentGroup {
+					theseValidations, err := tv.GetValidations(context, tag)
+					if err != nil {
+						return fmt.Errorf("tag %q: %w", tv.TagName(), err)
+					}
+					validations.Add(theseValidations)
+				}
+			}
+			return nil
+		}
+
+		for _, tag := range phaseTags {
+			if tag.Name != currentGroupName {
+				if err := processGroup(); err != nil {
+					return Validations{}, err
+				}
+				currentGroupName = tag.Name
+				currentGroup = []codetags.Tag{tag}
+			} else {
+				currentGroup = append(currentGroup, tag)
+			}
+		}
+		if err := processGroup(); err != nil {
+			return Validations{}, err
+		}
+	}
 	return validations, nil
 }
 
@@ -318,6 +408,18 @@ type Validator interface {
 	// or more validations, which will later be rendered by the code-generation
 	// logic.
 	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractTagValidations considers the given context and evaluates
+	// registered tag-validators only. This is useful for meta-validators which
+	// want to extract validations for a payload tag without triggering the
+	// full validation lifecycle.
+	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+
+	// ExtractSandboxValidations considers the given context and evaluates
+	// registered tag-validators and field-validators in "Sandbox Mode".
+	// The provided Context must have an initialized Sandbox map. This allows
+	// wrapper tags to aggregate 2-phase tags safely without polluting global state.
+	ExtractSandboxValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
