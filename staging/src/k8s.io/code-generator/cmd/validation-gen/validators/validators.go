@@ -243,7 +243,38 @@ type Context struct {
 	// Sandbox provides an isolated namespace for stateful tags (like listType or update)
 	// to accumulate data when they are executed inside a conditional wrapper block
 	// (like +k8s:subfield or +k8s:member). It prevents global state pollution.
-	Sandbox map[string]any
+	Sandbox *Sandbox
+}
+
+// Sandbox is an encapsulated key-value store for isolated state accumulation.
+// It mirrors the design of context.Context, using 'any' for keys to allow
+// plugins to use unexported struct types as collision-free keys.
+type Sandbox struct {
+	store map[any]any
+}
+
+// NewSandbox creates a new, empty Sandbox.
+func NewSandbox() *Sandbox {
+	return &Sandbox{
+		store: make(map[any]any),
+	}
+}
+
+// Get retrieves a value from the sandbox.
+func (s *Sandbox) Get(key any) (any, bool) {
+	if s == nil || s.store == nil {
+		return nil, false
+	}
+	val, exists := s.store[key]
+	return val, exists
+}
+
+// Set stores a value in the sandbox.
+func (s *Sandbox) Set(key any, val any) {
+	if s.store == nil {
+		s.store = make(map[any]any)
+	}
+	s.store[key] = val
 }
 
 // Constant represents a constant value.

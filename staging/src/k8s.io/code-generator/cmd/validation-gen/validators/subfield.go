@@ -104,7 +104,7 @@ func (stv *subfieldTagValidator) GetGroupedValidations(context Context, tags []c
 			Path:       context.Path.Child(subname),
 			Member:     submemb,
 			ParentPath: context.Path,
-			Sandbox:    make(map[string]any),
+			Sandbox:    NewSandbox(),
 		}
 
 		validations, err := stv.validator.ExtractSandboxValidations(subContext, payloads...)

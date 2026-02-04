@@ -92,7 +92,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		Path:       context.Path.Key("(vals)"),
 		Member:     nil, // NA for list/map values
 		ParentPath: context.Path,
-		Sandbox:    make(map[string]any),
+		Sandbox:    NewSandbox(),
 	}
 	switch nt.Kind {
 	case types.Slice, types.Array:
@@ -274,7 +274,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		Path:       context.Path.Key("(keys)"),
 		Member:     nil, // NA for map keys
 		ParentPath: context.Path,
-		Sandbox:    make(map[string]any),
+		Sandbox:    NewSandbox(),
 	}
 
 	if validations, err := ektv.validator.ExtractSandboxValidations(elemContext, *tag.ValueTag); err != nil {

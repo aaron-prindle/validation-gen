@@ -66,6 +66,9 @@ const (
 	semanticMap    listSemantic = "map"    // uniqueness check based on key(s)
 )
 
+// listMetadataKey is used as a typed, collision-free key for the Sandbox.
+type listMetadataKey struct{}
+
 // listMetadata collects information about a single list with map or set semantics.
 type listMetadata struct {
 	ownership  listOwnership // For now we don't use it for generation.
@@ -137,10 +140,12 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 
 	var lm *listMetadata
 	if context.Sandbox != nil {
-		if context.Sandbox["listMetadata"] == nil {
-			context.Sandbox["listMetadata"] = &listMetadata{}
+		if val, exists := context.Sandbox.Get(listMetadataKey{}); exists {
+			lm = val.(*listMetadata)
+		} else {
+			lm = &listMetadata{}
+			context.Sandbox.Set(listMetadataKey{}, lm)
 		}
-		lm = context.Sandbox["listMetadata"].(*listMetadata)
 	} else {
 		lm = lttv.byPath[context.Path.String()]
 		if lm == nil {
@@ -245,10 +250,12 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 
 	var lm *listMetadata
 	if context.Sandbox != nil {
-		if context.Sandbox["listMetadata"] == nil {
-			context.Sandbox["listMetadata"] = &listMetadata{}
+		if val, exists := context.Sandbox.Get(listMetadataKey{}); exists {
+			lm = val.(*listMetadata)
+		} else {
+			lm = &listMetadata{}
+			context.Sandbox.Set(listMetadataKey{}, lm)
 		}
-		lm = context.Sandbox["listMetadata"].(*listMetadata)
 	} else {
 		lm = lmktv.byPath[context.Path.String()]
 		if lm == nil {
@@ -304,10 +311,12 @@ func (utv uniqueTagValidator) GetValidations(context Context, tag codetags.Tag) 
 
 	var lm *listMetadata
 	if context.Sandbox != nil {
-		if context.Sandbox["listMetadata"] == nil {
-			context.Sandbox["listMetadata"] = &listMetadata{}
+		if val, exists := context.Sandbox.Get(listMetadataKey{}); exists {
+			lm = val.(*listMetadata)
+		} else {
+			lm = &listMetadata{}
+			context.Sandbox.Set(listMetadataKey{}, lm)
 		}
-		lm = context.Sandbox["listMetadata"].(*listMetadata)
 	} else {
 		lm = utv.byPath[context.Path.String()]
 		if lm == nil {
@@ -381,10 +390,12 @@ func (cutv customUniqueTagValidator) GetValidations(context Context, tag codetag
 
 	var lm *listMetadata
 	if context.Sandbox != nil {
-		if context.Sandbox["listMetadata"] == nil {
-			context.Sandbox["listMetadata"] = &listMetadata{}
+		if val, exists := context.Sandbox.Get(listMetadataKey{}); exists {
+			lm = val.(*listMetadata)
+		} else {
+			lm = &listMetadata{}
+			context.Sandbox.Set(listMetadataKey{}, lm)
 		}
-		lm = context.Sandbox["listMetadata"].(*listMetadata)
 	} else {
 		lm = cutv.byPath[context.Path.String()]
 		if lm == nil {
@@ -436,7 +447,7 @@ func (lv listValidator) GetValidations(context Context) (Validations, error) {
 	// Look up the list metadata which is defined on this field or type.
 	var lm *listMetadata
 	if context.Sandbox != nil {
-		if val, exists := context.Sandbox["listMetadata"]; exists {
+		if val, exists := context.Sandbox.Get(listMetadataKey{}); exists {
 			lm = val.(*listMetadata)
 		}
 	} else {

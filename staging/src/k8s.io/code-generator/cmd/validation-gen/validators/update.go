@@ -37,6 +37,9 @@ func init() {
 	RegisterTagValidator(updateTagCollector{byFieldPath: shared})
 }
 
+// updateConstraintKey is used as a typed, collision-free key for the Sandbox.
+type updateConstraintKey struct{}
+
 // updateTagCollector collects +k8s:update tags
 type updateTagCollector struct {
 	byFieldPath map[string]sets.Set[validate.UpdateConstraint]
@@ -65,10 +68,12 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 
 	if context.Sandbox != nil {
 		// Sandbox Mode
-		if context.Sandbox[updateTagName] == nil {
-			context.Sandbox[updateTagName] = sets.New[validate.UpdateConstraint]()
+		if val, exists := context.Sandbox.Get(updateConstraintKey{}); exists {
+			constraintSet = val.(sets.Set[validate.UpdateConstraint])
+		} else {
+			constraintSet = sets.New[validate.UpdateConstraint]()
+			context.Sandbox.Set(updateConstraintKey{}, constraintSet)
 		}
-		constraintSet = context.Sandbox[updateTagName].(sets.Set[validate.UpdateConstraint])
 	} else {
 		// Global Mode
 		if utc.byFieldPath[fieldPath] == nil {
@@ -183,8 +188,8 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 
 	if context.Sandbox != nil {
 		// Sandbox Mode
-		if s, exists := context.Sandbox[updateTagName]; exists {
-			constraintSet = s.(sets.Set[validate.UpdateConstraint])
+		if val, exists := context.Sandbox.Get(updateConstraintKey{}); exists {
+			constraintSet = val.(sets.Set[validate.UpdateConstraint])
 			ok = true
 		}
 	} else {

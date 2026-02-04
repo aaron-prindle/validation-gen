@@ -67,7 +67,7 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 	}
 	result := Validations{}
 	if context.Sandbox == nil {
-		context.Sandbox = make(map[string]any)
+		context.Sandbox = NewSandbox()
 	}
 	if validations, err := itv.validator.ExtractSandboxValidations(context, *tag.ValueTag); err != nil {
 		return Validations{}, err
