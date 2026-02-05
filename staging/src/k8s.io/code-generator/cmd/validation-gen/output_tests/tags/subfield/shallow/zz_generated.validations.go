@@ -38,6 +38,14 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	// type IfEnabledUpdateStruct
+	scheme.AddValidationFunc((*IfEnabledUpdateStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_IfEnabledUpdateStruct(ctx, op, nil /* fldPath */, obj.(*IfEnabledUpdateStruct), safe.Cast[*IfEnabledUpdateStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type Struct
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		switch op.Request.SubresourcePath() {
@@ -47,6 +55,39 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
+}
+
+// Validate_IfEnabledUpdateStruct validates an instance of IfEnabledUpdateStruct according
+// to declarative validation rules in the API schema.
+func Validate_IfEnabledUpdateStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IfEnabledUpdateStruct) (errs field.ErrorList) {
+	// field IfEnabledUpdateStruct.TypeMeta has no validation
+
+	// field IfEnabledUpdateStruct.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "StrictUpdates", true, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+				return validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+			}); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("status"), obj.Status, safe.Field(oldObj, func(oldObj *IfEnabledUpdateStruct) *string { return oldObj.Status }), oldObj != nil)...)
+
+	return errs
 }
 
 // Validate_Struct validates an instance of Struct according

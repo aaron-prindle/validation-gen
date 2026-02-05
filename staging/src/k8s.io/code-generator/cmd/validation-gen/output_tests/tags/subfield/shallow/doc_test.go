@@ -53,3 +53,14 @@ func Test(t *testing.T) {
 		"structPtrField.mapField":     {"subfield Struct.StructPtrField.MapField"},
 	})
 }
+
+func TestIfEnabledUpdateStruct(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	// Valid update: unchanged
+	st.Value(&IfEnabledUpdateStruct{
+		Status: ptr.To("old"),
+	}).OldValue(&IfEnabledUpdateStruct{
+		Status: ptr.To("old"),
+	}).ExpectValid()
+}

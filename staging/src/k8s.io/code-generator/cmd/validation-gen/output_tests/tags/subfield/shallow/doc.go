@@ -56,3 +56,10 @@ type OtherStruct struct {
 type SmallStruct struct {
 	StringField string `json:"stringField"`
 }
+
+// BUG REPRODUCTION:
+type IfEnabledUpdateStruct struct {
+	TypeMeta int     `json:"typeMeta"`
+	// +k8s:ifEnabled(StrictUpdates)=+k8s:update=NoModify
+	Status   *string `json:"status"`
+}
