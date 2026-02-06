@@ -204,6 +204,8 @@ The error matcher applies the regex to the Declarative Validation error paths. I
 ---
 
 ## Example PRs
+- https://github.com/kubernetes/kubernetes/pull/134796 (Storage: wire storage group for declarative validation and +k8s:required to StorageClass.Provisioner)
+- https://github.com/kubernetes/kubernetes/pull/135520 (Core: Enable Declarative Validation for LimitRange without plumbing DV through type)
 - https://github.com/kubernetes/kubernetes/pull/135935 (Networking: Network Tag CIDR Declarative Validation)
 - https://github.com/kubernetes/kubernetes/pull/135046 (Node: wire node group for declarative validation)
 - https://github.com/kubernetes/kubernetes/pull/134909 (Network: wire network group for declarative validation and +k8s:required to IngressClassParametersReference.Name)
