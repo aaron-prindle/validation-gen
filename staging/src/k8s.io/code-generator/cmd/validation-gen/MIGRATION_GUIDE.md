@@ -2,7 +2,7 @@
 
 This document is a guide for migrating existing hand-written validation logic in Kubernetes API types to the new **Declarative Validation** system using `+k8s:` tags.
 
-The goal when migrating hand-written validation is to create migration PRs that allow for strict backward compatibility with existing error messages/behaviours and for the 1+ declarative validation migrations tags validated the idea is that in the future the related hand-written code should be able to be removed for a given migration PR.
+The goal when migrating hand-written validation is to create migration PRs that allow for strict backward compatibility with existing error messages/behaviours. For these migrations, the DV framework operates in **Shadow Mode** by default. This means the declarative tags are evaluated alongside the handwritten code, and any mismatches are recorded as metrics, but the declarative errors do not reject the request (the handwritten code remains authoritative). In the future, once stability is proven via metrics, the related hand-written code will be removed.
 
 ---
 
@@ -10,23 +10,31 @@ The goal when migrating hand-written validation is to create migration PRs that 
 
 Maintainers strongly recommend the following **commit strategy** to ensure reviews are smooth and debugging is easy.
 
-### 1. **Commit #1: Infrastructure Setup**
+### 1. **Commit #1: Infrastructure Setup (If not already wired)**
 -   Wire up `doc.go` (enable generation).
 -   Update `strategy.go` to call the declarative validator.
 -   Create the `declarative_validation_test.go` file with the test harness.
 -   Add the initial (empty) generated files.
 -   **Goal**: Prove the plumbing works without changing any logic.
 
-### 2. **Commit #2: The First Field**
+### 2. **Commit #2: The First Tag/Field**
 -   Pick a **single, simple field** (e.g., a top-level `Required` field).
--   Add the `+k8s:required` tag.
+-   Add a **single DV tag** (e.g., `+k8s:required`).
 -   Mark the hand-written error as covered.
 -   Add precise test cases.
+    *   *Emphasis on test-cases*: We want enough to prove that a field is correct, but we don't want to duplicate all the per-tag tests (e.g. a `k8s-short-name` field has dozens of corner cases, but we really only need a few). We want each case to be as short and specific as possible, which is why the "tweak" pattern and the use of `.WithOrigin()` for Invalid() errors is so important. Specify as little as possible to be sufficiently precise.
 -   **Goal**: Establish the pattern for the rest of the PR.
 
-### 3. **Commits #3...N: Iterate**
--   Migrate remaining fields one by one (or in small, related groups).
--   **Rule of Thumb**: One tag/field per commit is often best for newcomers.
+### 3. **Commits #3...N: Iterate on the Same Field**
+-   Use additional DV tags on the same field, **one tag per commit**.
+-   Repeat until that field is fully migrated or all that is left is not handled by DV yet.
+-   Includes generated code and tests for each tag addition.
+
+### 4. **Commits N+1...M: Iterate on More Fields**
+-   Repeat the above process for additional fields.
+-   **Rule of Thumb**: The emphasis is on lots of small commits. Maintaining commit discipline is hard but worthwhile.
+
+*Note: If DV exposes bugs in the existing testing or the hand-written validation itself, those should be fixed as a PR of its own or as commits at the front of the PR.*
 
 ---
 
@@ -51,9 +59,12 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
     
     // NEW:
     return rest.ValidateDeclarativelyWithMigrationChecks(
+        ctx,
+        legacyscheme.Scheme,
         obj,
-        validation.ValidateFoo(), // Pass the old validation function
-        nil,                    // Options (usually nil)
+        nil, // Old object (for updates)
+        validation.ValidateFoo(), // Pass the old validation function errors
+        operation.Create,
     )
 }
 ```
@@ -193,8 +204,11 @@ The error matcher applies the regex to the Declarative Validation error paths. I
 ---
 
 ## Example PRs
-- https://github.com/kubernetes/kubernetes/pull/134796 (w/ plumbing DV through type - NOTE: commit structure is not ideal, see above docs)
-- https://github.com/kubernetes/kubernetes/pull/135520 (w/o plumbing DV through type)
+- https://github.com/kubernetes/kubernetes/pull/135935 (Networking: Network Tag CIDR Declarative Validation)
+- https://github.com/kubernetes/kubernetes/pull/135046 (Node: wire node group for declarative validation)
+- https://github.com/kubernetes/kubernetes/pull/134909 (Network: wire network group for declarative validation and +k8s:required to IngressClassParametersReference.Name)
+- https://github.com/kubernetes/kubernetes/pull/135412 (Autoscaling: HPA: Enable DV support for MaxReplicas)
+- https://github.com/kubernetes/kubernetes/pull/135890 (Discovery: wire discovery group for declarative validation and migrate Endpoint.Addresses + EndpointSlice.AddressType)
 
 ## Step-by-Step Migration Example
 
